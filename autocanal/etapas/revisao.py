@@ -63,12 +63,15 @@ def _texto_roteiro(roteiro: dict) -> str:
 
 
 def _roteiros_anteriores(ctx: Contexto) -> list[tuple[str, str]]:
-    """(job, texto) dos últimos `N_ROTEIROS` outros jobs do canal que têm `roteiro.json`."""
+    """(job, texto) dos últimos `N_ROTEIROS` outros jobs do canal com `roteiro.json`.
+
+    Jobs descartados não contam (como em `titulos_recentes`): nunca foram publicados.
+    """
     roteiros: list[tuple[str, str]] = []
     for j in reversed(fila.listar(ctx.con, canal=ctx.job.canal)):
         if len(roteiros) >= N_ROTEIROS:
             break
-        if j.id == ctx.job.id:
+        if j.id == ctx.job.id or j.estado == Estado.DESCARTADO:
             continue
         arquivo = ctx.cfg.dados / "jobs" / j.id / "roteiro.json"
         try:

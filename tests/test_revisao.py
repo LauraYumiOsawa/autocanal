@@ -210,6 +210,12 @@ def test_similaridade_ignora_outros_canais(ctx, cfg, con):
     assert revisao.checagens(ctx) == []
 
 
+def test_similaridade_ignora_descartados(ctx, cfg, con):
+    j = _outro_job(cfg, con, "teste", _roteiro())
+    fila.mudar_estado(con, j.id, Estado.DESCARTADO)
+    assert revisao.checagens(ctx) == []
+
+
 def test_checagens_ok_chama_claude_e_aprova(ctx, cfg, con, claude_falso):
     cfg.claude.bin = claude_falso.claude_bin
     _outro_job(cfg, con, "teste", _roteiro(["Assunto diferente, nada a ver."]), "Céu azul em 40 s")
