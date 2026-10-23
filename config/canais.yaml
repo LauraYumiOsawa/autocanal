@@ -22,3 +22,14 @@ musica:
   fonte_nome: DejaVu Sans
   perfil_voz: config/vozes/exemplo.md
   grade: []  # preenchida no Plano 3
+teste:
+  nome: Teste
+  nicho: "curiosidades de ciência"
+  idioma: pt-BR
+  categoria_id: "27"
+  paleta: {fundo: "#0F172A", texto: "#F8FAFC", destaque: "#FACC15"}
+  tts: {provedor: kokoro, voz: pf_dora, reserva: falso}
+  fonte_arquivo: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+  fonte_nome: DejaVu Sans
+  perfil_voz: config/vozes/teste.md
+  grade: []  # canal só para provas locais: o tick nunca planeja nada aqui
