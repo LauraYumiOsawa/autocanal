@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from autocanal import fila, produtor, relatorio
+from autocanal import fila, planejador, produtor, relatorio
 from autocanal.db import conectar
 from autocanal.fila import Estado
 
@@ -75,6 +75,7 @@ def test_resumo_tem_secoes_e_links(cfg, con):
     agora = datetime.now(UTC)
     (cfg.dados / "cota_esgotada_ate").write_text((agora + timedelta(hours=2)).isoformat())
     produtor.pausar_claude(cfg, agora)
+    planejador.adiar_planejamento(cfg, agora)
     _chamada(con, "2026-10-25T03:00:00+00:00", 0.5)
     _chamada(con, "2026-10-26T02:59:59.900000+00:00", 0.25)
     _chamada(con, "2026-10-26T03:00:00+00:00", 9.0)  # já é 26/10 em São Paulo
@@ -99,6 +100,7 @@ def test_resumo_tem_secoes_e_links(cfg, con):
     al = _secao(texto, "Alertas")
     assert "invalid_grant" in al and "autocanal auth teste" in al
     assert "Cota do YouTube esgotada" in al and "limite de uso" in al
+    assert "Planejamento automático adiado" in al
     assert f"autocanal vetar {agendado.id}" in _secao(texto, "Supervisão")
     consumo = _secao(texto, "Consumo do Claude")
     assert "2 chamadas" in consumo and "US$ 0.75" in consumo

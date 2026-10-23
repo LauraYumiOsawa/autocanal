@@ -5,8 +5,10 @@ import logging
 import sqlite3
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from autocanal import claude, fila, grade
+from autocanal.claude import LimiteUsoClaude
 from autocanal.config import Canal, Config
 from autocanal.etapas.base import carregar_prompt, lista_md, titulos_do_canal
 from autocanal.fila import Estado, Job
@@ -16,6 +18,7 @@ log = logging.getLogger(__name__)
 
 MARGEM = timedelta(hours=2)
 SEMANA = timedelta(days=7)
+RECUO = timedelta(hours=4)
 FERRAMENTAS = ["Skill", "Read", "WebSearch", "WebFetch"]
 N_TITULOS = 15
 N_TEMAS_USADOS = 60
@@ -40,34 +43,79 @@ def registrar_tema(con: sqlite3.Connection, canal: str, formato: str, tema: str)
     con.commit()
 
 
+def _marcador_recuo(cfg: Config) -> Path:
+    return cfg.dados / "planejar_apos"
+
+
+def adiar_planejamento(cfg: Config, agora: datetime) -> datetime:
+    """Grava `dados/planejar_apos` (agora + 4 h, ISO UTC): o tick não planeja antes disso."""
+    ate = (agora + RECUO).astimezone(UTC)
+    cfg.dados.mkdir(parents=True, exist_ok=True)
+    _marcador_recuo(cfg).write_text(ate.isoformat(), encoding="utf-8")
+    return ate
+
+
+def planejar_apos(cfg: Config) -> datetime | None:
+    """Fim do recuo após uma falha de planejamento (None se não houver marcador legível)."""
+    try:
+        ate = datetime.fromisoformat(_marcador_recuo(cfg).read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+    return ate.replace(tzinfo=UTC) if ate.tzinfo is None else ate
+
+
+def _planejar_um(
+    cfg: Config, con: sqlite3.Connection, canal: Canal, formato: str,
+    inicio: datetime, fim: datetime, sugerir_temas: SugerirTemas,
+) -> list[Job]:
+    tomados = ocupados(con, canal.slug, formato)
+    livres = [s for s in grade.slots(canal, formato, inicio, fim, cfg.fuso) if s not in tomados]
+    if not livres:
+        return []
+    temas = [t.strip() for t in sugerir_temas(canal, formato, len(livres)) if t.strip()]
+    if len(temas) < len(livres):
+        log.warning("%s/%s: %d de %d temas sugeridos; o resto fica para o próximo"
+                    " planejamento", canal.slug, formato, len(temas), len(livres))
+    criados = []
+    for slot, tema in zip(livres, temas):
+        criados.append(fila.criar_job(con, canal.slug, formato, tema, slot))
+        registrar_tema(con, canal.slug, formato, tema)
+    return criados
+
+
 def planejar(
     cfg: Config, con: sqlite3.Connection, agora: datetime, *, sugerir_temas: SugerirTemas
 ) -> list[Job]:
     """Cria jobs para os slots livres em [agora + 2 h, agora + folga_dias + 7 dias).
 
     Um pedido de temas por canal/formato com slot livre; o i-ésimo tema vai para o
-    i-ésimo slot. Canal sem `nicho` é ignorado com aviso.
+    i-ésimo slot. Canal sem `nicho` é ignorado com aviso. Falha num canal/formato é
+    registrada e não impede os outros; havendo falha, grava o recuo de 4 h
+    (`adiar_planejamento`), e uma rodada sem falhas o apaga. `LimiteUsoClaude` sobe
+    (quem chama grava a pausa do Claude).
     """
     inicio = agora + MARGEM
     fim = agora + timedelta(days=cfg.folga_dias) + SEMANA
     criados: list[Job] = []
+    falhou = False
     for canal in cfg.canais.values():
         if not canal.nicho.strip():
             log.warning("canal %s sem nicho em canais.yaml: não planejado", canal.slug)
             continue
         for formato in FORMATOS:
-            tomados = ocupados(con, canal.slug, formato)
-            livres = [s for s in grade.slots(canal, formato, inicio, fim, cfg.fuso)
-                      if s not in tomados]
-            if not livres:
-                continue
-            temas = [t.strip() for t in sugerir_temas(canal, formato, len(livres)) if t.strip()]
-            if len(temas) < len(livres):
-                log.warning("%s/%s: %d de %d temas sugeridos; o resto fica para o próximo"
-                            " planejamento", canal.slug, formato, len(temas), len(livres))
-            for slot, tema in zip(livres, temas):
-                criados.append(fila.criar_job(con, canal.slug, formato, tema, slot))
-                registrar_tema(con, canal.slug, formato, tema)
+            try:
+                criados += _planejar_um(cfg, con, canal, formato, inicio, fim, sugerir_temas)
+            except LimiteUsoClaude:
+                raise
+            except Exception as e:
+                falhou = True
+                log.warning("falha ao planejar %s/%s: %s", canal.slug, formato,
+                            str(e) or type(e).__name__)
+    if falhou:
+        ate = adiar_planejamento(cfg, agora)
+        log.warning("planejamento automático adiado até %s", ate.isoformat())
+    else:
+        _marcador_recuo(cfg).unlink(missing_ok=True)
     return criados
 
 

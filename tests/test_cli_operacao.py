@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from typer.testing import CliRunner
 
-from autocanal import agendador, cli, fila
+from autocanal import agendador, cli, fila, planejador
 from autocanal.db import conectar
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
@@ -83,6 +83,12 @@ def test_status_nao_usa_trava(cfg, con, rodar):
 
 
 # --- status / novo -------------------------------------------------------------------
+
+def test_status_mostra_planejamento_adiado(cfg, rodar):
+    planejador.adiar_planejamento(cfg, datetime.now(UTC))
+    r = rodar("status")
+    assert r.exit_code == 0 and "Planejamento automático adiado" in r.output
+
 
 def test_status_contagens_e_proximos(con, rodar):
     a = _job(con, publish_at=datetime(2026, 11, 2, 15, tzinfo=UTC))
@@ -180,10 +186,10 @@ def test_tick_liga_as_fases_reais(cfg, rodar, monkeypatch):
     assert chamadas == {"publicar": (quando, "yt"), "sincronizar": (quando, "yt")}
 
 
-def test_tick_pulado_pela_trava_sai_sem_erro(cfg, rodar):
+def test_tick_pulado_pela_trava_sai_com_2(cfg, rodar):
     with agendador.trava(cfg.dados / "tick.lock"):
         r = rodar("tick")
-    assert r.exit_code == 0
+    assert r.exit_code == 2
     assert "outro processo do autocanal está rodando" in r.output
 
 
@@ -365,6 +371,7 @@ def test_instalar_timer_so_escreve(raiz_teste, rodar, home):
     servico = (unidades / "autocanal.service").read_text()
     assert f"ExecStart={raiz_teste}/.venv/bin/autocanal --raiz {raiz_teste} tick" in servico
     assert "Type=oneshot" in servico
+    assert "SuccessExitStatus=2" in servico  # tick pulado pela trava não é falha
     timer = (unidades / "autocanal.timer").read_text()
     assert "OnCalendar=*:0/15" in timer and "Persistent=true" in timer
     assert "WantedBy=timers.target" in timer

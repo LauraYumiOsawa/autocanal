@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from autocanal import agendador, fila, produtor
-from autocanal.claude import LimiteUsoClaude
+from autocanal import agendador, fila, planejador, produtor
+from autocanal.claude import ErroClaude, LimiteUsoClaude
 from autocanal.db import conectar
 from autocanal.fila import Estado
 
@@ -73,7 +73,8 @@ class Fases:
 
 
 def _tick(cfg, con, fases, agora=AGORA):
-    return agendador.tick(cfg, con, agora.astimezone(UTC), **fases.kwargs())
+    agora = agora.astimezone(UTC)
+    return agendador.tick(cfg, con, agora, relogio=lambda: agora, **fases.kwargs())
 
 
 def test_tick_ordem_das_fases(cfg_nicho, con):
@@ -189,8 +190,7 @@ def test_tick_pula_producao_durante_pausa_do_claude(cfg_nicho, con):
     assert "produzir" in fases.ordem
 
 
-def test_tick_limite_do_claude_no_planejamento_pausa(cfg_nicho, con, monkeypatch):
-    monkeypatch.setattr(agendador, "monotonic", lambda: 0.0)
+def test_tick_limite_do_claude_no_planejamento_pausa(cfg_nicho, con):
     fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
     fases = Fases()
 
@@ -198,27 +198,53 @@ def test_tick_limite_do_claude_no_planejamento_pausa(cfg_nicho, con, monkeypatch
         fases.ordem.append("planejar")
         raise LimiteUsoClaude("usage limit reached")
 
-    r = agendador.tick(cfg_nicho, con, AGORA.astimezone(UTC),
+    agora = AGORA.astimezone(UTC)
+    r = agendador.tick(cfg_nicho, con, agora, relogio=lambda: agora,
                        **{**fases.kwargs(), "planejar_fn": planejar})
     assert fases.ordem == ["planejar", "publicar", "sincronizar", "resumo"]
     assert r.produzido is None
     assert produtor.pausa_claude_ate(cfg_nicho) == AGORA.astimezone(UTC) + timedelta(hours=1)
 
 
-def test_tick_publica_com_relogio_atualizado(cfg_nicho, con, monkeypatch):
-    t = [100.0]
-    monkeypatch.setattr(agendador, "monotonic", lambda: t[0])
+def test_tick_publica_com_relogio_atualizado(cfg_nicho, con):
+    agora = AGORA.astimezone(UTC)
+    t = [agora]
     fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
     fases = Fases()
     produzir_original = fases.produzir
 
     def produzir_demorado(cfg, con, job_id):
-        t[0] += 20 * 60  # a produção levou 20 minutos
+        t[0] += timedelta(minutes=20)  # a produção levou 20 minutos
         return produzir_original(cfg, con, job_id)
 
-    agendador.tick(cfg_nicho, con, AGORA.astimezone(UTC),
+    agendador.tick(cfg_nicho, con, agora, relogio=lambda: t[0],
                    **{**fases.kwargs(), "produzir_fn": produzir_demorado})
-    depois = AGORA.astimezone(UTC) + timedelta(minutes=20)
-    assert fases.horarios["planejar"] == AGORA.astimezone(UTC)
+    depois = agora + timedelta(minutes=20)
+    assert fases.horarios["planejar"] == agora
     assert fases.horarios["publicar"] == depois
     assert fases.horarios["sincronizar"] == depois
+
+
+def test_tick_relogio_padrao_e_o_real(cfg_nicho, con):
+    fases = Fases()
+    agendador.tick(cfg_nicho, con, datetime.now(UTC), **fases.kwargs())
+    assert abs(fases.horarios["publicar"] - datetime.now(UTC)) < timedelta(minutes=1)
+
+
+def test_tick_adia_planejamento_apos_falha(cfg_nicho, con):
+    pedidos = []
+
+    def sugerir(canal, formato, n):
+        pedidos.append(n)
+        raise ErroClaude("falhou após 3 tentativas")
+
+    def planejar(cfg, con, agora):
+        return planejador.planejar(cfg, con, agora, sugerir_temas=sugerir)
+
+    kwargs = {**Fases().kwargs(), "planejar_fn": planejar}
+    inicio = AGORA.astimezone(UTC)
+    for minutos, esperados in ((0, 1), (4 * 60 - 1, 1), (4 * 60, 2)):
+        agora = inicio + timedelta(minutes=minutos)
+        agendador.tick(cfg_nicho, con, agora, relogio=lambda: agora, **kwargs)
+        assert len(pedidos) == esperados, minutos
+    assert planejador.planejar_apos(cfg_nicho) == inicio + timedelta(hours=8)

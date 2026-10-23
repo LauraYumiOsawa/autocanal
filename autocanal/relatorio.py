@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from autocanal import fila, produtor, publicador
+from autocanal import fila, planejador, produtor, publicador
 from autocanal.config import Config
 from autocanal.fila import Estado, Job
 
@@ -74,7 +74,7 @@ def _quarentena(cfg: Config, con: sqlite3.Connection) -> list[str]:
 
 
 def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
-    """Canais sem autorização, cota do YouTube esgotada e pausa do Claude em vigor."""
+    """Canais sem autorização, cota do YouTube esgotada, pausa do Claude e recuo do planejador."""
     avisos: list[str] = []
     conhecidos: set[str] = set()
     for r in con.execute("SELECT canal, auth_ok, ultimo_erro FROM canais_estado ORDER BY canal"):
@@ -94,6 +94,10 @@ def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
     if pausa is not None and agora < pausa:
         avisos.append(f"Claude pausado por limite de uso do plano até {_hora(cfg, pausa)}:"
                       " a produção retoma depois.")
+    recuo = planejador.planejar_apos(cfg)
+    if recuo is not None and agora < recuo:
+        avisos.append(f"Planejamento automático adiado até {_hora(cfg, recuo)} por falha ao"
+                      " sugerir temas (detalhes no log do tick); `autocanal planejar` tenta já.")
     return avisos
 
 

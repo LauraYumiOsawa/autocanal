@@ -8,12 +8,11 @@ import sqlite3
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
-from time import monotonic
 from zoneinfo import ZoneInfo
 
-from autocanal import fila, grade, produtor, relatorio
+from autocanal import fila, grade, planejador, produtor, relatorio
 from autocanal.claude import LimiteUsoClaude
 from autocanal.config import Config
 from autocanal.fila import Estado
@@ -77,6 +76,11 @@ def _claude_livre(cfg: Config, agora: datetime) -> bool:
     return ate is None or agora >= ate
 
 
+def _planejar_liberado(cfg: Config, agora: datetime) -> bool:
+    ate = planejador.planejar_apos(cfg)
+    return ate is None or agora >= ate
+
+
 def tick(
     cfg: Config,
     con: sqlite3.Connection,
@@ -87,37 +91,36 @@ def tick(
     publicar_fn: Callable[[Config, sqlite3.Connection, datetime], list[str]],
     sincronizar_fn: Callable[[Config, sqlite3.Connection, datetime], list[str]],
     resumo_fn: Callable[[Config, sqlite3.Connection, date], Path],
+    relogio: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> ResumoTick:
     """Um passo do agendador, dentro da trava `dados/tick.lock`.
 
     (1) planeja se a fila estiver curta; (2) produz o próximo job; (3) envia os
     aprovados; (4) sincroniza os publicados; (5) gera o resumo do dia a partir das
-    07:00 locais, uma vez. Planejar e produzir esperam a pausa do Claude. Erro numa
-    fase é registrado no log e não impede as seguintes.
+    07:00 locais, uma vez. O planejamento usa `agora` (início do tick); as fases
+    seguintes leem `relogio()` na hora, porque a produção pode levar dezenas de
+    minutos. Planejar espera a pausa do Claude e o recuo após falha
+    (`planejador.planejar_apos`); produzir espera a pausa. Erro numa fase é
+    registrado no log e não impede as seguintes.
     """
     try:
         with trava(cfg.dados / "tick.lock"):
-            return _passo(cfg, con, agora, planejar_fn, produzir_fn, publicar_fn,
+            return _passo(cfg, con, agora, relogio, planejar_fn, produzir_fn, publicar_fn,
                           sincronizar_fn, resumo_fn)
     except TravaOcupada:
         log.info("tick pulado: outro processo do autocanal está rodando")
         return ResumoTick(pulou_por_trava=True)
 
 
-def _passo(cfg, con, agora, planejar_fn, produzir_fn, publicar_fn, sincronizar_fn,
+def _passo(cfg, con, agora, relogio, planejar_fn, produzir_fn, publicar_fn, sincronizar_fn,
            resumo_fn) -> ResumoTick:
-    inicio = monotonic()
-
-    def relogio() -> datetime:
-        # a produção pode levar dezenas de minutos: as fases seguintes veem a hora atual
-        return agora + timedelta(seconds=monotonic() - inicio)
-
     r = ResumoTick(pulou_por_trava=False)
     try:
-        if _claude_livre(cfg, relogio()) and fila_curta(cfg, con, relogio()):
-            r.planejados = len(planejar_fn(cfg, con, relogio()))
+        if (_claude_livre(cfg, agora) and _planejar_liberado(cfg, agora)
+                and fila_curta(cfg, con, agora)):
+            r.planejados = len(planejar_fn(cfg, con, agora))
     except LimiteUsoClaude:
-        ate = produtor.pausar_claude(cfg, relogio())
+        ate = produtor.pausar_claude(cfg, agora)
         log.warning("limite de uso do Claude ao planejar; pausa até %s", ate.isoformat())
     except Exception:
         log.exception("tick: falha ao planejar")

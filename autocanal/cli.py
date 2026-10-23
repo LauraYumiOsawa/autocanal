@@ -406,9 +406,9 @@ def tick(ctx: typer.Context) -> None:
         resumo_fn=_resumo_e_aviso,
     )
     if r.pulou_por_trava:
-        # normal quando uma produção longa ainda roda: não é falha do serviço
-        typer.echo("tick pulado: outro processo do autocanal está rodando")
-        return
+        # como os outros comandos com trava; o serviço trata 2 como sucesso (SuccessExitStatus)
+        typer.echo("outro processo do autocanal está rodando", err=True)
+        raise typer.Exit(2)
     typer.echo(f"planejados: {r.planejados}")
     typer.echo(f"produzido: {r.produzido or 'nenhum'}")
     typer.echo(f"enviados: {', '.join(r.enviados) or 'nenhum'}")
@@ -424,6 +424,8 @@ Description=autocanal: um passo do agendador (planejar, produzir, publicar)
 [Service]
 Type=oneshot
 ExecStart={exe} --raiz {raiz} tick
+# 2 = tick pulado porque outro processo do autocanal segura a trava: não é falha
+SuccessExitStatus=2
 """
 
 _TIMER = """\

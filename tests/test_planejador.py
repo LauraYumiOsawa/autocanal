@@ -1,11 +1,12 @@
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from autocanal import fila, planejador
+from autocanal.claude import ErroClaude, LimiteUsoClaude
 from autocanal.db import conectar
 from autocanal.fila import Estado
 
@@ -90,6 +91,40 @@ def test_planejar_temas_a_menos(cfg_nicho, con, caplog):
     assert [j.tema for j in jobs] == ["só um"]
     assert jobs[0].publish_at == SLOTS[0].astimezone(UTC)
     assert "1 de 5" in caplog.text
+
+
+def test_planejar_isola_falha_por_canal_e_adia(cfg_nicho, con, caplog):
+    cfg = cfg_nicho
+    cfg.canais["outro"] = cfg.canais["teste"].model_copy(update={"slug": "outro"})
+    pedidos = []
+
+    def sugerir(canal, formato, n):
+        pedidos.append(canal.slug)
+        if canal.slug == "teste":
+            raise ErroClaude("falhou após 3 tentativas")
+        return [f"t{i}" for i in range(n)]
+
+    with caplog.at_level(logging.WARNING, logger="autocanal.planejador"):
+        jobs = planejador.planejar(cfg, con, AGORA, sugerir_temas=sugerir)
+    assert pedidos == ["teste", "outro"]
+    assert [j.canal for j in jobs] == ["outro"] * 5
+    assert "teste/short" in caplog.text and "falhou após 3 tentativas" in caplog.text
+    assert planejador.planejar_apos(cfg) == AGORA.astimezone(UTC) + timedelta(hours=4)
+    assert (cfg.dados / "planejar_apos").read_text() == (
+        AGORA.astimezone(UTC) + timedelta(hours=4)).isoformat()
+    # uma rodada sem falhas apaga o marcador
+    planejador.planejar(cfg, con, AGORA, sugerir_temas=Sugestor())
+    assert planejador.planejar_apos(cfg) is None
+    assert {j.canal for j in fila.listar(con)} == {"teste", "outro"}
+
+
+def test_planejar_limite_do_claude_propaga(cfg_nicho, con):
+    def sugerir(canal, formato, n):
+        raise LimiteUsoClaude("usage limit reached")
+
+    with pytest.raises(LimiteUsoClaude):
+        planejador.planejar(cfg_nicho, con, AGORA, sugerir_temas=sugerir)
+    assert planejador.planejar_apos(cfg_nicho) is None
 
 
 def _ok(dados):
