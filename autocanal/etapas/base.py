@@ -17,14 +17,17 @@ from autocanal.midia import Midia
 PROBLEMAS_REVISAO = "problemas_revisao.json"
 
 
-def etapas_a_refazer(ordem: tuple[str, ...], etapa: str) -> list[str]:
+def etapas_a_refazer(
+    ordem: tuple[str, ...], etapa: str, refazer_metadados: bool = False
+) -> list[str]:
     """Etapas a resetar quando a revisão pede para refazer a partir de `etapa`.
 
     Da `etapa` até o fim, mais a `revisao`; `metadados` só entra se ela própria foi a
-    escolhida ou se o roteiro (de onde o título sai) muda.
+    escolhida, se o roteiro (de onde o título sai) muda ou se a revisão também reprovou
+    os metadados (`refazer_metadados`).
     """
     nomes = [n for n in ordem[ordem.index(etapa):] if n not in ("metadados", "revisao")]
-    if etapa in ("roteiro", "metadados") and "metadados" in ordem:
+    if (etapa in ("roteiro", "metadados") or refazer_metadados) and "metadados" in ordem:
         nomes.append("metadados")
     return nomes + ["revisao"]
 PERFIL_VOZ_PADRAO = (

@@ -222,7 +222,8 @@ def preparar_refazer(cfg: Config, con: sqlite3.Connection, job_id: str) -> Job:
                        ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        fila.resetar_etapas(con, job_id, etapas_a_refazer(ordem, etapa))
+        fila.resetar_etapas(con, job_id, etapas_a_refazer(
+            ordem, etapa, bool(ultima.get("refazer_metadados"))))
         fila.atualizar(con, job_id, tentativas_revisao=0)
         return fila.mudar_estado(con, job_id, Estado.PRODUZINDO)
     return job

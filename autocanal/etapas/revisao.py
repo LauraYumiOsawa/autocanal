@@ -32,7 +32,7 @@ FOLGA_LEGENDAS_S = 1.0
 REVISAO = {
     "type": "object",
     "required": ["aprovado", "nota", "problemas", "etapa_para_refazer",
-                 "contains_synthetic_media"],
+                 "refazer_metadados", "contains_synthetic_media"],
     "additionalProperties": False,
     "properties": {
         "aprovado": {"type": "boolean"},
@@ -42,6 +42,7 @@ REVISAO = {
             "type": ["string", "null"],
             "enum": ["roteiro", "narracao", "legendas", "visuais", "render", "metadados", None],
         },
+        "refazer_metadados": {"type": "boolean"},
         "contains_synthetic_media": {"type": "boolean"},
     },
 }
@@ -205,12 +206,16 @@ def executar(ctx: Contexto) -> None:
         resultado = {
             "origem": "checagens", "aprovado": False, "problemas": [p for p, _ in falhas],
             "etapa_para_refazer": _etapa_mais_cedo(ctx, [e for _, e in falhas]),
+            "refazer_metadados": any(e == "metadados" for _, e in falhas),
         }
     else:
         resultado = {"origem": "revisor", **_revisor(ctx)}
         resultado["etapa_para_refazer"] = (
             None if resultado["aprovado"]
             else _etapa_mais_cedo(ctx, [resultado["etapa_para_refazer"]])
+        )
+        resultado["refazer_metadados"] = (
+            not resultado["aprovado"] and bool(resultado["refazer_metadados"])
         )
     aprovado, problemas = resultado["aprovado"], resultado["problemas"]
     etapa = resultado["etapa_para_refazer"]
@@ -234,7 +239,8 @@ def executar(ctx: Contexto) -> None:
     else:
         # refaz da etapa mais cedo até a própria revisão (zera as tentativas dela também)
         gravar_json(ctx, PROBLEMAS_REVISAO, {"problemas": problemas})
-        fila.resetar_etapas(ctx.con, job.id, etapas_a_refazer(ctx.formato.etapas, etapa))
+        fila.resetar_etapas(ctx.con, job.id, etapas_a_refazer(
+            ctx.formato.etapas, etapa, resultado["refazer_metadados"]))
         novo = Estado.PRODUZINDO
     fila.atualizar(ctx.con, job.id, tentativas_revisao=rodada)
     fila.mudar_estado(ctx.con, job.id, novo)

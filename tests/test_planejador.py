@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -152,7 +153,7 @@ def test_sugerir_temas_claude(cfg_nicho, con, claude_falso):
     assert temas == ["Por que o céu é azul — o erro que a escola ensina", "Raios"]
     argv = claude_falso.chamadas()[0]
     assert argv[argv.index("--allowedTools") + 1:] == ["Skill", "Read", "WebSearch", "WebFetch"]
-    assert "Read(~/.claude/**)" in argv
+    assert f"Read(/{Path.home()}/.claude/**)" in argv
     assert argv[argv.index("--model") + 1] == "sonnet"
     assert argv[argv.index("--max-turns") + 1] == "15"
     schema = json.loads(argv[argv.index("--json-schema") + 1])

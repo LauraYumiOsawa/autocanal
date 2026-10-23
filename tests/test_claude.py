@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from autocanal.claude import (
@@ -54,7 +56,7 @@ def test_montar_argv_nega_segredos(tmp_path):
         assert f"{ferr}(/{raiz}/dados/tokens/**)" in negadas
         assert f"{ferr}(/{raiz}/config/**)" in negadas
         assert f"{ferr}(/{raiz}/dados/*.db)" in negadas
-        assert f"{ferr}(~/.claude/**)" in negadas
+        assert f"{ferr}(/{Path.home()}/.claude/**)" in negadas
     assert negadas[0].startswith("Read(//")
 
 
@@ -154,3 +156,30 @@ def test_registrar(tmp_path):
         "job1", "roteiro", 0.25, 4, 12.5,
     )
     assert linha["criado_em"].endswith("+00:00")
+
+
+def test_limite_de_sessao_real(claude_falso, tmp_path):
+    # mensagem real do CLI em 2026-10-23
+    claude_falso.responder({
+        "type": "result", "subtype": "success", "is_error": True,
+        "result": "You've hit your session limit · resets 9am (America/Sao_Paulo)",
+    })
+    with pytest.raises(LimiteUsoClaude):
+        _chamar(claude_falso, tmp_path)
+    assert len(claude_falso.chamadas()) == 1
+
+
+def test_montar_argv_nega_pastas_pessoais(tmp_path, monkeypatch):
+    casa = tmp_path / "casa"
+    monkeypatch.setenv("HOME", str(casa))
+    argv = montar_argv(
+        "p", SCHEMA, ["Read"], modelo=None, max_turns=5, claude_bin="c", raiz=tmp_path / "raiz"
+    )
+    negadas = argv[argv.index("--disallowedTools") + 1:argv.index("--allowedTools")]
+    pastas = (".ssh", ".config", ".aws", ".gnupg", ".docker", ".kube", ".local/share",
+              ".claude", "Downloads", "Documents", "Desktop")
+    for ferr in ("Read", "Edit", "Write"):
+        for pasta in pastas:
+            assert f"{ferr}(/{casa}/{pasta}/**)" in negadas
+        for arquivo in (".netrc", ".git-credentials", ".bash_history"):
+            assert f"{ferr}(/{casa}/{arquivo})" in negadas

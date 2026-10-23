@@ -38,7 +38,7 @@ def test_short_offline_gera_mp4_valido(cfg, claude_falso, monkeypatch):
              "descricao": "Resumo do vídeo.", "tags": ["mar", "ciência"],
              "consultas_alvo": ["por que o mar é salgado", "sal do mar", "água do mar"]}),
         _ok({"aprovado": True, "nota": 90, "problemas": [], "etapa_para_refazer": None,
-             "contains_synthetic_media": False}),
+             "refazer_metadados": False, "contains_synthetic_media": False}),
     )
 
     def transcrever_falso(wav, **kw):

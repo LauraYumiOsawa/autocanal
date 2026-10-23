@@ -420,3 +420,18 @@ def test_instalar_timer_ativar(rodar, home):
     _, systemctl = home
     assert rodar("instalar-timer", "--ativar").exit_code == 0
     assert systemctl[-1] == ["systemctl", "--user", "enable", "--now", "autocanal.timer"]
+
+
+def test_produzir_quarentena_respeita_refazer_metadados(cfg, con, rodar, producao):
+    j = _job(con, *QUARENTENA)
+    fila.atualizar(con, j.id, tentativas_revisao=1)
+    for n in ETAPAS:
+        fila.marcar_etapa(con, j.id, n, "ok")
+    pasta = _pasta(cfg, j.id)
+    (pasta / "revisao_1.json").write_text(json.dumps({
+        "problemas": ["silêncio", "título fraco"], "etapa_para_refazer": "render",
+        "refazer_metadados": True}))
+    r = rodar("produzir", j.id)
+    assert r.exit_code == 0, r.output
+    assert [fila.estado_etapa(con, j.id, n) for n in ETAPAS] == [
+        "ok", "ok", "ok", "ok", None, None, None]

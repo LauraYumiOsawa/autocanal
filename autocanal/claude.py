@@ -11,7 +11,10 @@ from pathlib import Path
 
 import jsonschema
 
-_LIMITE = re.compile(r"(?i)usage limit|rate limit|limit reached|hour limit|weekly limit")
+_LIMITE = re.compile(
+    r"(?i)usage limit|rate limit|session limit|limit reached|hour limit|weekly limit"
+    r"|hit your [^.]{0,40}limit"
+)
 
 
 @dataclass(frozen=True)
@@ -34,17 +37,25 @@ class ErroClaudeIndisponivel(ErroClaude):
     """O CLI do Claude não pode rodar (binário ausente/sem permissão): falha do sistema."""
 
 
+# Credenciais e dados pessoais fora do projeto que o Claude headless nunca precisa ler.
+PASTAS_PESSOAIS = (".claude", ".ssh", ".config", ".aws", ".gnupg", ".docker", ".kube",
+                   ".local/share", "Downloads", "Documents", "Desktop")
+ARQUIVOS_PESSOAIS = (".netrc", ".git-credentials", ".bash_history")
+
+
 def regras_negadas(raiz: Path) -> list[str]:
     """Regras `--disallowedTools` que impedem o Claude headless de ler/alterar segredos.
 
     Caminhos absolutos usam `//` na sintaxe de permissões do CLI.
     """
     raiz = Path(raiz).resolve()
+    casa = Path.home()
     alvos = [
         f"/{raiz}/dados/tokens/**",
         f"/{raiz}/config/**",
         f"/{raiz}/dados/*.db",
-        "~/.claude/**",
+        *(f"/{casa}/{pasta}/**" for pasta in PASTAS_PESSOAIS),
+        *(f"/{casa}/{arquivo}" for arquivo in ARQUIVOS_PESSOAIS),
     ]
     return [f"{ferr}({alvo})" for alvo in alvos for ferr in ("Read", "Edit", "Write")]
 

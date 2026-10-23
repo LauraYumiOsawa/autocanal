@@ -108,10 +108,12 @@ def _ok(dados):
     }
 
 
-def _parecer(aprovado: bool, etapa: str | None = None, sintetico: bool = False, problemas=()):
+def _parecer(aprovado: bool, etapa: str | None = None, sintetico: bool = False, problemas=(),
+             refazer_metadados: bool = False):
     return _ok({
         "aprovado": aprovado, "nota": 90 if aprovado else 40, "problemas": list(problemas),
-        "etapa_para_refazer": etapa, "contains_synthetic_media": sintetico,
+        "etapa_para_refazer": etapa, "refazer_metadados": refazer_metadados,
+        "contains_synthetic_media": sintetico,
     })
 
 
@@ -339,3 +341,37 @@ def test_revisor_pode_pedir_refazer_legendas():
     assert "legendas" in enum
     prompt = Path(revisao.__file__).parent.parent / "prompts" / "revisao.md"
     assert "`legendas`" in prompt.read_text(encoding="utf-8")
+
+
+def test_etapas_a_refazer_inclui_metadados_quando_pedido():
+    from autocanal.etapas.base import etapas_a_refazer
+
+    assert etapas_a_refazer(ETAPAS, "render", refazer_metadados=True) == [
+        "render", "metadados", "revisao"]
+    assert etapas_a_refazer(ETAPAS, "visuais") == ["visuais", "render", "revisao"]
+
+
+def test_checagens_render_e_titulo_refazem_metadados(ctx, cfg, con, videos):
+    _trocar_video("paisagem")(ctx, cfg, con, videos)
+    _titulo_fraco(ctx, cfg, con, videos)
+    revisao.executar(ctx)
+
+    j = fila.obter(con, ctx.job.id)
+    assert j.estado == Estado.PRODUZINDO
+    r = ler_json(ctx, "revisao_1.json")
+    assert r["etapa_para_refazer"] == "render" and r["refazer_metadados"] is True
+    assert fila.estado_etapa(con, j.id, "metadados") is None
+    assert fila.estado_etapa(con, j.id, "visuais") == "ok"
+
+
+def test_revisor_pede_metadados_junto_com_visuais(ctx, cfg, con, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    claude_falso.responder(_parecer(
+        False, "visuais", problemas=["imagem não combina", "título vago"],
+        refazer_metadados=True))
+    revisao.executar(ctx)
+
+    j = fila.obter(con, ctx.job.id)
+    assert [fila.estado_etapa(con, j.id, n) for n in ETAPAS] == [
+        "ok", "ok", "ok", None, None, None, None]
+    assert ler_json(ctx, "revisao_1.json")["refazer_metadados"] is True
