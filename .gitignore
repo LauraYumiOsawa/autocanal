@@ -7,3 +7,4 @@ __pycache__/
 vendor/
 servicos/*/modelos/
 .pytest_cache/
+.superpowers/
