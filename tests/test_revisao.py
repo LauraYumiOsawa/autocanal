@@ -23,7 +23,7 @@ TEXTOS = [
     "A água evapora, mas o sal fica para trás e se acumula.",
     "Por isso cada litro de água do mar tem cerca de trinta e cinco gramas de sal.",
 ]
-FERRAMENTAS_REVISOR = ["Read", "WebFetch", "WebSearch", "Bash(python3:*)"]
+FERRAMENTAS_REVISOR = ["Read", "WebFetch", "WebSearch"]
 
 
 def _video(midia: Midia, destino: Path, duracao: int, tamanho="1080x1920", audio="tom"):
@@ -232,6 +232,7 @@ def test_checagens_ok_chama_claude_e_aprova(ctx, cfg, con, claude_falso):
 
     [argv] = claude_falso.chamadas()
     assert argv[argv.index("--allowedTools") + 1:] == FERRAMENTAS_REVISOR
+    assert f"Read(/{cfg.raiz.resolve()}/dados/*.db)" in argv
     assert argv[argv.index("--max-turns") + 1] == "30" and "--model" not in argv
     prompt = argv[2]
     assert "revisao/quadros/quadro_01.jpg" in prompt and "revisao/quadros/quadro_06.jpg" in prompt

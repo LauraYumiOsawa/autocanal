@@ -18,7 +18,7 @@ from autocanal.etapas.base import (
 from autocanal.fila import Estado
 
 NOME = "revisao"
-FERRAMENTAS = ["Read", "WebFetch", "WebSearch", "Bash(python3:*)"]
+FERRAMENTAS = ["Read", "WebFetch", "WebSearch"]
 N_QUADROS = 6
 N_TITULOS = 15
 N_ROTEIROS = 30
@@ -183,6 +183,7 @@ def _revisor(ctx: Contexto) -> dict:
         modelo=ctx.cfg.claude.modelos.get(NOME),
         max_turns=ctx.cfg.claude.max_turns.get(NOME, 20),
         claude_bin=ctx.cfg.claude.bin,
+        raiz=ctx.cfg.raiz,
     )
     claude.registrar(ctx.con, ctx.job.id, NOME, r)
     return r.dados

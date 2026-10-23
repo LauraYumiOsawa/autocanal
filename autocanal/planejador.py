@@ -177,6 +177,7 @@ def sugerir_temas_claude(cfg: Config, con: sqlite3.Connection) -> SugerirTemas:
             modelo=cfg.claude.modelos.get("temas"),
             max_turns=cfg.claude.max_turns.get("temas", 15),
             claude_bin=cfg.claude.bin,
+            raiz=cfg.raiz,
         )
         claude.registrar(con, None, "temas", r)
         return [_juntar(t) for t in r.dados["temas"]]

@@ -139,9 +139,11 @@ def test_roteiro_grava_json_e_valida_palavras(ctx, cfg, claude_falso):
     roteiro.executar(ctx)
     assert ler_json(ctx, "roteiro.json") == _roteiro(100)
     argv = claude_falso.chamadas()[-1]
+    script = cfg.plugin_dir / "skills" / "yt-script" / "hookscore.py"
     assert argv[argv.index("--allowedTools") + 1:] == [
-        "Skill", "Read", "Bash(python3:*)", "WebSearch", "WebFetch"
+        "Skill", "Read", f"Bash(python3 {script}:*)", "WebSearch", "WebFetch"
     ]
+    assert f"Read(/{cfg.raiz.resolve()}/dados/tokens/**)" in argv
     assert argv[argv.index("--max-turns") + 1] == "30"
     assert "--model" not in argv
     n = ctx.con.execute(

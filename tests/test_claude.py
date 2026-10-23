@@ -39,6 +39,30 @@ def test_montar_argv_ordem():
     sem = montar_argv("p", SCHEMA, ["Read"], modelo=None, max_turns=5, claude_bin="c")
     assert "--model" not in sem
     assert sem[-2:] == ["--allowedTools", "Read"]
+    assert "--disallowedTools" not in sem
+
+
+def test_montar_argv_nega_segredos(tmp_path):
+    argv = montar_argv(
+        "p", SCHEMA, ["Read"], modelo=None, max_turns=5, claude_bin="c", raiz=tmp_path
+    )
+    i, j = argv.index("--disallowedTools"), argv.index("--allowedTools")
+    assert i < j and argv[j + 1:] == ["Read"]
+    negadas = argv[i + 1:j]
+    raiz = tmp_path.resolve()
+    for ferr in ("Read", "Edit", "Write"):
+        assert f"{ferr}(/{raiz}/dados/tokens/**)" in negadas
+        assert f"{ferr}(/{raiz}/config/**)" in negadas
+        assert f"{ferr}(/{raiz}/dados/*.db)" in negadas
+        assert f"{ferr}(~/.claude/**)" in negadas
+    assert negadas[0].startswith("Read(//")
+
+
+def test_chamar_repassa_raiz(claude_falso, tmp_path):
+    claude_falso.responder(_ok({"x": 1}))
+    _chamar(claude_falso, tmp_path, raiz=tmp_path)
+    [argv] = claude_falso.chamadas()
+    assert f"Read(/{tmp_path.resolve()}/config/**)" in argv
 
 
 def test_chamar_structured_output(claude_falso, tmp_path):

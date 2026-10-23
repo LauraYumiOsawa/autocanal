@@ -16,7 +16,10 @@ from autocanal.etapas.base import (
 )
 from autocanal.texto import sanitizar_texto
 
-FERRAMENTAS = ["Skill", "Read", "Bash(python3:*)"]
+def ferramentas(ctx: Contexto) -> list[str]:
+    """Ferramentas do Claude: Bash só para o linter de título do plugin."""
+    script = ctx.cfg.plugin_dir / "skills" / "yt-package" / "title.py"
+    return ["Skill", "Read", f"Bash(python3 {script}:*)"]
 LIMITE_TAGS = 500
 LIMITE_DESCRICAO_BYTES = 5000
 
@@ -92,11 +95,12 @@ def executar(ctx: Contexto) -> None:
     r = claude.chamar(
         prompt,
         METADADOS,
-        FERRAMENTAS,
+        ferramentas(ctx),
         ctx.pasta,
         modelo=ctx.cfg.claude.modelos.get("metadados"),
         max_turns=ctx.cfg.claude.max_turns.get("metadados", 20),
         claude_bin=ctx.cfg.claude.bin,
+        raiz=ctx.cfg.raiz,
     )
     claude.registrar(ctx.con, ctx.job.id, "metadados", r)
     d = r.dados

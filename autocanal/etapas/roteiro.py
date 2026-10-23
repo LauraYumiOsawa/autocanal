@@ -14,7 +14,10 @@ from autocanal.etapas.base import (
 )
 from autocanal.texto import contar_palavras
 
-FERRAMENTAS = ["Skill", "Read", "Bash(python3:*)", "WebSearch", "WebFetch"]
+def ferramentas(ctx: Contexto) -> list[str]:
+    """Ferramentas do Claude: Bash só para o script de nota de gancho do plugin."""
+    script = ctx.cfg.plugin_dir / "skills" / "yt-script" / "hookscore.py"
+    return ["Skill", "Read", f"Bash(python3 {script}:*)", "WebSearch", "WebFetch"]
 
 _TEXTO = {"type": "string"}
 ROTEIRO_SHORT = {
@@ -64,11 +67,12 @@ def executar(ctx: Contexto) -> None:
     r = claude.chamar(
         prompt,
         ROTEIRO_SHORT,
-        FERRAMENTAS,
+        ferramentas(ctx),
         ctx.pasta,
         modelo=ctx.cfg.claude.modelos.get("roteiro"),
         max_turns=ctx.cfg.claude.max_turns.get("roteiro", 20),
         claude_bin=ctx.cfg.claude.bin,
+        raiz=ctx.cfg.raiz,
     )
     claude.registrar(ctx.con, ctx.job.id, "roteiro", r)
     palavras = contar_palavras(" ".join(s["texto"] for s in r.dados["segmentos"]))

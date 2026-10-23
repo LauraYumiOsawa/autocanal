@@ -128,7 +128,11 @@ def test_metadados_grava_json(ctx, cfg, claude_falso):
         "sintetico": False,
     }
     argv = claude_falso.chamadas()[0]
-    assert argv[argv.index("--allowedTools") + 1:] == ["Skill", "Read", "Bash(python3:*)"]
+    script = cfg.plugin_dir / "skills" / "yt-package" / "title.py"
+    assert argv[argv.index("--allowedTools") + 1:] == [
+        "Skill", "Read", f"Bash(python3 {script}:*)"
+    ]
+    assert f"Read(/{cfg.raiz.resolve()}/config/**)" in argv
     assert argv[argv.index("--model") + 1] == "sonnet"
     assert argv[argv.index("--max-turns") + 1] == "20"
     prompt = argv[2]

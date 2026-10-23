@@ -30,6 +30,21 @@ class LimiteUsoClaude(ErroClaude):
     pass
 
 
+def regras_negadas(raiz: Path) -> list[str]:
+    """Regras `--disallowedTools` que impedem o Claude headless de ler/alterar segredos.
+
+    Caminhos absolutos usam `//` na sintaxe de permissões do CLI.
+    """
+    raiz = Path(raiz).resolve()
+    alvos = [
+        f"/{raiz}/dados/tokens/**",
+        f"/{raiz}/config/**",
+        f"/{raiz}/dados/*.db",
+        "~/.claude/**",
+    ]
+    return [f"{ferr}({alvo})" for alvo in alvos for ferr in ("Read", "Edit", "Write")]
+
+
 def montar_argv(
     prompt: str,
     schema: dict,
@@ -38,6 +53,7 @@ def montar_argv(
     modelo: str | None,
     max_turns: int,
     claude_bin: str,
+    raiz: Path | None = None,
 ) -> list[str]:
     return (
         [
@@ -48,6 +64,7 @@ def montar_argv(
             "--max-turns", str(max_turns),
         ]
         + (["--model", modelo] if modelo else [])
+        + (["--disallowedTools", *regras_negadas(raiz)] if raiz is not None else [])
         + ["--allowedTools", *ferramentas]
     )
 
@@ -94,10 +111,12 @@ def chamar(
     claude_bin: str = "claude",
     tentativas: int = 3,
     timeout_s: int = 900,
+    raiz: Path | None = None,
     executar=subprocess.run,
 ) -> ResultadoClaude:
     argv = montar_argv(
-        prompt, schema, ferramentas, modelo=modelo, max_turns=max_turns, claude_bin=claude_bin
+        prompt, schema, ferramentas,
+        modelo=modelo, max_turns=max_turns, claude_bin=claude_bin, raiz=raiz,
     )
     motivo = "nenhuma tentativa feita"
     for _ in range(tentativas):
