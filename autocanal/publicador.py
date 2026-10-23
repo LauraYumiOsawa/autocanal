@@ -170,6 +170,13 @@ def publicar_aprovados(
     return enviados
 
 
+def _falhar_youtube(con, job, detalhe: str) -> None:
+    """Marca `falhou` e limpa o id (guardado no erro) para que uma reaprovação reenvie."""
+    fila.mudar_estado(con, job.id, Estado.FALHOU,
+                      erro=f"youtube: {detalhe} (vídeo {job.youtube_video_id})")
+    fila.atualizar(con, job.id, youtube_video_id=None)
+
+
 _REJEITADOS = {"rejected", "failed", "deleted"}
 
 
@@ -195,12 +202,10 @@ def sincronizar_publicados(
         for j in jobs:
             info = estados.get(j.youtube_video_id)
             if info is None:
-                fila.mudar_estado(con, j.id, Estado.FALHOU, erro="youtube: vídeo não encontrado")
+                _falhar_youtube(con, j, "vídeo não encontrado")
             elif info.get("uploadStatus") in _REJEITADOS:
                 motivo = info.get("rejectionReason") or info.get("failureReason") or ""
-                fila.mudar_estado(
-                    con, j.id, Estado.FALHOU, erro=f"youtube: {info['uploadStatus']}: {motivo}"
-                )
+                _falhar_youtube(con, j, f"{info['uploadStatus']}: {motivo}")
             elif j.publish_at <= agora and info.get("privacyStatus") == "public":
                 fila.mudar_estado(con, j.id, Estado.PUBLICADO)
                 feitos.append(j.id)

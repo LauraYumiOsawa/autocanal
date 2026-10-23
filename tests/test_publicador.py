@@ -316,7 +316,7 @@ def test_sincronizar_rejeitado_antes_do_horario(cfg, con, monkeypatch):
         "r": {"privacyStatus": "private", "uploadStatus": "rejected", "rejectionReason": "copyright"}})
     assert publicador.sincronizar_publicados(cfg, con, AGORA, youtube_por_canal=lambda c: MagicMock()) == []
     f = fila.obter(con, j.id)
-    assert f.estado == Estado.FALHOU and f.erro == "youtube: rejected: copyright"
+    assert f.estado == Estado.FALHOU and f.erro == "youtube: rejected: copyright (vídeo r)" and f.youtube_video_id is None
 
 
 def test_sincronizar_failed_usa_failure_reason(cfg, con, monkeypatch):
@@ -324,7 +324,7 @@ def test_sincronizar_failed_usa_failure_reason(cfg, con, monkeypatch):
     monkeypatch.setattr(publicador.upload, "status", lambda yt, ids: {
         "r": {"uploadStatus": "failed", "failureReason": "codec"}})
     publicador.sincronizar_publicados(cfg, con, AGORA, youtube_por_canal=lambda c: MagicMock())
-    assert fila.obter(con, j.id).erro == "youtube: failed: codec"
+    assert fila.obter(con, j.id).erro == "youtube: failed: codec (vídeo r)"
 
 
 def test_sincronizar_video_ausente(cfg, con, monkeypatch):
@@ -332,7 +332,7 @@ def test_sincronizar_video_ausente(cfg, con, monkeypatch):
     monkeypatch.setattr(publicador.upload, "status", lambda yt, ids: {})
     publicador.sincronizar_publicados(cfg, con, AGORA, youtube_por_canal=lambda c: MagicMock())
     f = fila.obter(con, j.id)
-    assert f.estado == Estado.FALHOU and f.erro == "youtube: vídeo não encontrado"
+    assert f.estado == Estado.FALHOU and f.erro == "youtube: vídeo não encontrado (vídeo sumiu)"
 
 
 def test_refresh_error_real_no_next_chunk_isola_canal(cfg2, con, monkeypatch):
@@ -351,3 +351,20 @@ def test_refresh_error_real_no_next_chunk_isola_canal(cfg2, con, monkeypatch):
     assert fila.obter(con, a.id).estado == Estado.APROVADO
     assert fila.obter(con, b.id).estado == Estado.AGENDADO
     assert con.execute("SELECT auth_ok FROM canais_estado WHERE canal='teste'").fetchone()[0] == 0
+
+
+def test_reaprovar_apos_rejeicao_reenvia(cfg, con, monkeypatch):
+    j = _agendado(cfg, con, AGORA + timedelta(days=2), "velho")
+    monkeypatch.setattr(publicador.upload, "status", lambda yt, ids: {
+        "velho": {"uploadStatus": "rejected", "rejectionReason": "copyright"}})
+    publicador.sincronizar_publicados(cfg, con, AGORA, youtube_por_canal=lambda c: MagicMock())
+    f = fila.obter(con, j.id)
+    assert f.estado == Estado.FALHOU and f.youtube_video_id is None
+    assert f.erro == "youtube: rejected: copyright (vídeo velho)"
+    fila.mudar_estado(con, j.id, Estado.APROVADO)
+    env = MagicMock(return_value="novo")
+    monkeypatch.setattr(publicador.upload, "enviar", env)
+    assert _pub(cfg, con, lambda c: MagicMock()) == ["novo"]
+    assert env.call_count == 1
+    n = fila.obter(con, j.id)
+    assert n.estado == Estado.AGENDADO and n.youtube_video_id == "novo"
