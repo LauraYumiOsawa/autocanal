@@ -1,0 +1,102 @@
+import pytest
+
+from autocanal.claude import (
+    ErroClaude,
+    LimiteUsoClaude,
+    ResultadoClaude,
+    chamar,
+    montar_argv,
+    registrar,
+)
+from autocanal.db import conectar
+
+SCHEMA = {"type": "object", "required": ["x"], "properties": {"x": {"type": "integer"}}}
+
+
+def _ok(dados, **extra):
+    return {
+        "type": "result",
+        "subtype": "success",
+        "is_error": False,
+        "num_turns": 3,
+        "total_cost_usd": 0.1,
+        "duration_ms": 1200,
+        "structured_output": dados,
+        **extra,
+    }
+
+
+def _chamar(falso, tmp_path, **kw):
+    return chamar("oi", SCHEMA, ["Read", "Write"], tmp_path, claude_bin=falso.claude_bin, **kw)
+
+
+def test_montar_argv_ordem():
+    argv = montar_argv("p", SCHEMA, ["Read", "Write"], modelo="sonnet", max_turns=5, claude_bin="c")
+    assert argv[:3] == ["c", "-p", "p"]
+    assert argv[-3:] == ["--allowedTools", "Read", "Write"]
+    assert argv[argv.index("--model") + 1] == "sonnet"
+    assert argv[argv.index("--max-turns") + 1] == "5"
+    sem = montar_argv("p", SCHEMA, ["Read"], modelo=None, max_turns=5, claude_bin="c")
+    assert "--model" not in sem
+    assert sem[-2:] == ["--allowedTools", "Read"]
+
+
+def test_chamar_structured_output(claude_falso, tmp_path):
+    claude_falso.responder(_ok({"x": 1}))
+    r = _chamar(claude_falso, tmp_path)
+    assert r.dados == {"x": 1}
+    assert r.turnos == 3
+    assert r.custo_usd == 0.1
+    assert r.duracao_s == 1.2
+    assert len(claude_falso.chamadas()) == 1
+
+
+def test_chamar_fallback_result_json(claude_falso, tmp_path):
+    saida = _ok(None)
+    del saida["structured_output"]
+    saida["result"] = '{"x": 7}'
+    claude_falso.responder(saida)
+    assert _chamar(claude_falso, tmp_path).dados == {"x": 7}
+
+
+def test_chamar_invalido_tenta_de_novo(claude_falso, tmp_path):
+    claude_falso.responder(_ok({"y": 1}), _ok({"x": 2}))
+    r = _chamar(claude_falso, tmp_path)
+    assert r.dados == {"x": 2}
+    assert len(claude_falso.chamadas()) == 2
+
+
+def test_chamar_esgota_tentativas(claude_falso, tmp_path):
+    claude_falso.responder(_ok({"y": 1}), _ok({"y": 1}), _ok({"y": 1}))
+    with pytest.raises(ErroClaude):
+        _chamar(claude_falso, tmp_path)
+    assert len(claude_falso.chamadas()) == 3
+
+
+def test_limite_de_uso(claude_falso, tmp_path):
+    claude_falso.responder(
+        {"type": "result", "subtype": "success", "is_error": True, "result": "Claude usage limit reached"}
+    )
+    with pytest.raises(LimiteUsoClaude):
+        _chamar(claude_falso, tmp_path)
+    assert len(claude_falso.chamadas()) == 1
+
+
+def test_timeout_conta_como_tentativa_falha(tmp_path):
+    import subprocess
+
+    def executar(*a, **k):
+        raise subprocess.TimeoutExpired("claude", 1)
+
+    with pytest.raises(ErroClaude, match="timeout"):
+        chamar("oi", SCHEMA, [], tmp_path, tentativas=2, executar=executar)
+
+
+def test_registrar(tmp_path):
+    con = conectar(tmp_path / "db.sqlite")
+    registrar(con, "job1", "roteiro", ResultadoClaude({"x": 1}, 0.25, 4, 12.5))
+    linha = con.execute("SELECT * FROM chamadas_claude").fetchone()
+    assert (linha["job_id"], linha["etapa"], linha["custo_usd"], linha["turnos"], linha["duracao_s"]) == (
+        "job1", "roteiro", 0.25, 4, 12.5,
+    )
+    assert linha["criado_em"].endswith("+00:00")

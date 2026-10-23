@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -50,3 +51,32 @@ teste:
 @pytest.fixture
 def cfg(raiz_teste: Path):
     return carregar(raiz_teste)
+
+
+class ClaudeFalso:
+    """Controla o executável falso do claude (tests/fakes/claude_falso.py)."""
+
+    def __init__(self, base: Path):
+        self.claude_bin = str(Path(__file__).parent / "fakes" / "claude_falso.py")
+        self._saidas = base / "saidas"
+        self._log = base / "chamadas.json"
+
+    def responder(self, *dicts: dict) -> None:
+        self._saidas.mkdir(exist_ok=True)
+        for i, d in enumerate(dicts, 1):
+            (self._saidas / f"{i:02d}.json").write_text(json.dumps(d), encoding="utf-8")
+
+    def chamadas(self) -> list[list[str]]:
+        if not self._log.exists():
+            return []
+        return json.loads(self._log.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def claude_falso(tmp_path: Path, monkeypatch) -> ClaudeFalso:
+    base = tmp_path / "claude_falso"
+    base.mkdir()
+    falso = ClaudeFalso(base)
+    monkeypatch.setenv("CLAUDE_FALSO_LOG", str(falso._log))
+    monkeypatch.setenv("CLAUDE_FALSO_SAIDAS", str(falso._saidas))
+    return falso
