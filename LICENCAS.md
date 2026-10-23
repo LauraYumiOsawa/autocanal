@@ -1,0 +1,11 @@
+# Licenças e limites das ferramentas
+
+| ferramenta | licença | uso comercial | link | verificado em |
+|---|---|---|---|---|
+| ACE-Step 1.5 | MIT | sim (uso comercial das músicas declarado no model card) | https://huggingface.co/ACE-Step | 2026-10-22 |
+| Google Cloud TTS (Chirp 3 HD) | Termos do Google Cloud | sim; 1M caracteres/mês grátis (Chirp 3 HD), 4M (Standard/WaveNet); exige conta de faturamento | https://cloud.google.com/text-to-speech/pricing | 2026-10-22 |
+| Kokoro | Apache 2.0 | sim | https://github.com/remsky/Kokoro-FastAPI | 2026-10-22 |
+| Pexels (API) | Licença Pexels | sim, sem atribuição obrigatória | https://www.pexels.com/license/ | 2026-10-22 |
+| Pixabay (API) | Licença Pixabay | sim, sem atribuição obrigatória | https://pixabay.com/service/license-summary/ | 2026-10-22 |
+| ffmpeg (build GPL, BtbN) | GPL | sim (uso como ferramenta externa, sem redistribuição) | https://github.com/BtbN/FFmpeg-Builds | 2026-10-22 |
+| faster-whisper | MIT | sim | https://github.com/SYSTRAN/faster-whisper | 2026-10-22 |

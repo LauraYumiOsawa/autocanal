@@ -1,0 +1,24 @@
+conteudo:
+  nome: Conteúdo
+  nicho: ""
+  idioma: pt-BR
+  categoria_id: "27"
+  paleta: {fundo: "#0F172A", texto: "#F8FAFC", destaque: "#FACC15"}
+  tts: {provedor: google, voz: pt-BR-Chirp3-HD-Charon, reserva: kokoro, voz_reserva: pm_alex}
+  fonte_arquivo: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+  fonte_nome: DejaVu Sans
+  perfil_voz: config/vozes/exemplo.md
+  grade:
+    - {formato: short, dias: [seg, qua, sex, dom], hora: "12:00"}
+    - {formato: short, dias: [ter, qui, sab], hora: "19:00"}
+musica:
+  nome: Música
+  nicho: ""
+  idioma: pt-BR
+  categoria_id: "10"
+  paleta: {fundo: "#0F172A", texto: "#F8FAFC", destaque: "#FACC15"}
+  tts: {provedor: google, voz: pt-BR-Chirp3-HD-Charon, reserva: kokoro, voz_reserva: pm_alex}
+  fonte_arquivo: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+  fonte_nome: DejaVu Sans
+  perfil_voz: config/vozes/exemplo.md
+  grade: []  # preenchida no Plano 3
