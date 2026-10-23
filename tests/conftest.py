@@ -80,3 +80,10 @@ def claude_falso(tmp_path: Path, monkeypatch) -> ClaudeFalso:
     monkeypatch.setenv("CLAUDE_FALSO_LOG", str(falso._log))
     monkeypatch.setenv("CLAUDE_FALSO_SAIDAS", str(falso._saidas))
     return falso
+
+
+@pytest.fixture
+def midia(cfg):
+    from autocanal.midia import Midia
+
+    return Midia(cfg.ffmpeg, cfg.ffprobe)
