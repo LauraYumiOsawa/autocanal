@@ -7,7 +7,7 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from autocanal import etapas, fila
+from autocanal import etapas, fila, servicos
 from autocanal.claude import ErroClaudeIndisponivel, LimiteUsoClaude
 from autocanal.config import Config
 from autocanal.etapas.base import (
@@ -18,7 +18,6 @@ from autocanal.etapas.base import (
 )
 from autocanal.fila import Estado, Job
 from autocanal.formatos import FORMATOS
-from autocanal.servicos import ServicoIndisponivel
 
 log = logging.getLogger(__name__)
 
@@ -75,8 +74,31 @@ def pausa_sistema(cfg: Config) -> tuple[datetime, str] | None:
     return ate, (linhas[1].strip() if len(linhas) > 1 else "")
 
 
+def _parar_kokoro(cfg: Config) -> None:
+    """Para o contêiner do Kokoro (se o projeto o tiver); erros só viram aviso."""
+    if not (cfg.raiz / "servicos" / "kokoro" / "docker-compose.yml").exists():
+        return
+    try:
+        servicos.parar("kokoro", cfg.raiz)
+    except Exception as e:  # noqa: BLE001 - parar é cortesia: nunca derruba a produção
+        log.warning("não consegui parar o Kokoro: %s", type(e).__name__)
+
+
 def produzir(
     cfg: Config, con: sqlite3.Connection, job_id: str, *, registro: dict | None = None
+) -> Estado:
+    """Roda as etapas pendentes do job (ver `_produzir`); se narrou, para o Kokoro no fim."""
+    executadas: set[str] = set()
+    try:
+        return _produzir(cfg, con, job_id, registro, executadas)
+    finally:
+        if "narracao" in executadas:
+            _parar_kokoro(cfg)
+
+
+def _produzir(
+    cfg: Config, con: sqlite3.Connection, job_id: str, registro: dict | None,
+    executadas: set[str],
 ) -> Estado:
     """Roda as etapas pendentes do job e devolve o estado em que ele parou.
 
@@ -116,6 +138,7 @@ def produzir(
                 ctx.job = fila.mudar_estado(con, job_id, Estado.EM_REVISAO)
             anterior = fila.estado_etapa(con, job_id, nome)
             fila.marcar_etapa(con, job_id, nome, "rodando")
+            executadas.add(nome)
             try:
                 etapa = registro.get(nome)
                 if etapa is None:
@@ -129,7 +152,7 @@ def produzir(
                             job_id, nome, ate.isoformat())
                 fila.restaurar_etapa(con, job_id, nome, anterior)
                 return fila.obter(con, job_id).estado
-            except (ErroClaudeIndisponivel, ServicoIndisponivel) as e:
+            except (ErroClaudeIndisponivel, servicos.ServicoIndisponivel) as e:
                 ate = pausar_sistema(cfg, str(e))
                 log.warning("queda geral em %s/%s (%s); produção pausada até %s",
                             job_id, nome, e, ate.isoformat())

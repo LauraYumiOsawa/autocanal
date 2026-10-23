@@ -158,6 +158,25 @@ def test_produzir_interrompida_tres_vezes_falha(cfg, con, job):
     assert chamadas == []
 
 
+def test_produzir_para_o_kokoro_se_narrou(cfg, con, job, monkeypatch):
+    from autocanal import produtor
+
+    paradas = []
+
+    def parar(nome, raiz):
+        paradas.append((nome, raiz))
+        raise OSError("docker fora")  # erro ao parar é ignorado
+
+    monkeypatch.setattr(produtor.servicos, "parar", parar)
+    compose = cfg.raiz / "servicos" / "kokoro" / "docker-compose.yml"
+    compose.parent.mkdir(parents=True)
+    compose.write_text("services: {}\n")
+    assert produzir(cfg, con, job.id, registro=_registro([])) == Estado.APROVADO
+    assert paradas == [("kokoro", cfg.raiz)]
+    produzir(cfg, con, job.id, registro=_registro([]))  # nada a fazer: não mexe no Docker
+    assert len(paradas) == 1
+
+
 def test_pausa_claude_ate_ilegivel(cfg):
     cfg.dados.mkdir(parents=True, exist_ok=True)
     (cfg.dados / "pausa_claude_ate").write_text("lixo")
