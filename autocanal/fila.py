@@ -173,9 +173,10 @@ def atualizar(con: sqlite3.Connection, job_id: str, **campos) -> Job:
 
 
 def proximo_para_produzir(con: sqlite3.Connection) -> Job | None:
+    """Job mais cedo ainda em produção; inclui `em_revisao` parado por erro ou limite."""
     r = con.execute(
-        "SELECT * FROM jobs WHERE estado IN (?, ?) ORDER BY publish_at, id LIMIT 1",
-        (Estado.PLANEJADO.value, Estado.PRODUZINDO.value),
+        "SELECT * FROM jobs WHERE estado IN (?, ?, ?) ORDER BY publish_at, id LIMIT 1",
+        (Estado.PLANEJADO.value, Estado.PRODUZINDO.value, Estado.EM_REVISAO.value),
     ).fetchone()
     return _job(r) if r else None
 

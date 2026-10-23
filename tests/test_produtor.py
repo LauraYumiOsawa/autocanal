@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -7,7 +7,7 @@ from autocanal.claude import LimiteUsoClaude
 from autocanal.db import conectar
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
-from autocanal.produtor import MAX_TENTATIVAS_ETAPA, produzir
+from autocanal.produtor import MAX_TENTATIVAS_ETAPA, pausa_claude_ate, pausar_claude, produzir
 
 PUBLICAR = datetime(2026, 11, 2, 15, 0, tzinfo=UTC)
 ETAPAS = FORMATOS["short"].etapas
@@ -94,12 +94,27 @@ def test_produzir_limite_uso_nao_conta_tentativa(cfg, con, job):
         chamadas.append("roteiro")
         raise LimiteUsoClaude("Claude usage limit reached")
 
+    assert pausa_claude_ate(cfg) is None
     estado = produzir(cfg, con, job.id, registro=_registro(chamadas, roteiro=limite))
     assert estado == Estado.PRODUZINDO
     assert fila.obter(con, job.id).estado == Estado.PRODUZINDO
     assert fila.tentativas_etapa(con, job.id, "roteiro") == 0
     assert fila.estado_etapa(con, job.id, "roteiro") != "ok"
     assert chamadas == ["roteiro"]
+    # spec §11: limite de uso adia a produção por 1 h (o tick respeita o marcador)
+    ate = pausa_claude_ate(cfg)
+    esperado = datetime.now(UTC) + timedelta(hours=1)
+    assert abs(ate - esperado) < timedelta(seconds=30)
+    assert (cfg.dados / "pausa_claude_ate").read_text() == ate.isoformat()
+
+
+def test_pausa_claude_ate_ilegivel(cfg):
+    cfg.dados.mkdir(parents=True, exist_ok=True)
+    (cfg.dados / "pausa_claude_ate").write_text("lixo")
+    assert pausa_claude_ate(cfg) is None
+    agora = datetime(2026, 10, 26, 12, tzinfo=UTC)
+    assert pausar_claude(cfg, agora) == agora + timedelta(hours=1)
+    assert pausa_claude_ate(cfg) == agora + timedelta(hours=1)
 
 
 def test_produzir_refazer_volta_a_produzir(cfg, con, job):

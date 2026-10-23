@@ -82,14 +82,21 @@ def problemas_revisao(ctx: Contexto) -> list[str]:
 
 
 def titulos_recentes(ctx: Contexto, n: int = 15) -> list[str]:
+    """Títulos recentes do canal do job, sem o do próprio job (ver `titulos_do_canal`)."""
+    return titulos_do_canal(ctx.cfg, ctx.con, ctx.job.canal, n, exceto=ctx.job.id)
+
+
+def titulos_do_canal(
+    cfg: Config, con: sqlite3.Connection, canal: str, n: int = 15, *, exceto: str | None = None
+) -> list[str]:
     """Títulos (de `metadados.json`) dos jobs mais recentes do canal, do mais novo ao mais velho."""
     titulos: list[str] = []
-    for j in reversed(fila.listar(ctx.con, canal=ctx.job.canal)):
+    for j in reversed(fila.listar(con, canal=canal)):
         if len(titulos) >= n:
             break
-        if j.id == ctx.job.id or j.estado == Estado.DESCARTADO:
+        if j.id == exceto or j.estado == Estado.DESCARTADO:
             continue
-        arquivo = ctx.cfg.dados / "jobs" / j.id / "metadados.json"
+        arquivo = cfg.dados / "jobs" / j.id / "metadados.json"
         try:
             titulo = json.loads(arquivo.read_text(encoding="utf-8")).get("titulo")
         except (OSError, ValueError, AttributeError):

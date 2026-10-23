@@ -60,12 +60,17 @@ def _marcador_cota(cfg: Config) -> Path:
     return cfg.dados / "cota_esgotada_ate"
 
 
-def _cota_bloqueada(cfg: Config, agora: datetime) -> bool:
+def cota_esgotada_ate(cfg: Config) -> datetime | None:
+    """Até quando a cota diária do YouTube está esgotada (None se não houver marcador)."""
     try:
-        ate = datetime.fromisoformat(_marcador_cota(cfg).read_text(encoding="utf-8").strip())
+        return datetime.fromisoformat(_marcador_cota(cfg).read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
-        return False
-    return agora < ate
+        return None
+
+
+def _cota_bloqueada(cfg: Config, agora: datetime) -> bool:
+    ate = cota_esgotada_ate(cfg)
+    return ate is not None and agora < ate
 
 
 def _proxima_meia_noite_la(agora: datetime) -> datetime:

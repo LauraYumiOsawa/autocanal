@@ -60,14 +60,20 @@ def test_todas_as_transicoes_declaradas():
 
 def test_proximo_para_produzir_ordem(con):
     base = datetime(2026, 10, 25, 15, tzinfo=UTC)
-    tarde = _novo(con, base + timedelta(days=2))
+    tarde = _novo(con, base + timedelta(days=3))
+    em_revisao = _novo(con, base + timedelta(days=2))
     cedo = _novo(con, base + timedelta(days=1))
     aprovado = _novo(con, base)
-    fila.mudar_estado(con, aprovado.id, Estado.PRODUZINDO)
-    fila.mudar_estado(con, aprovado.id, Estado.EM_REVISAO)
-    fila.mudar_estado(con, aprovado.id, Estado.APROVADO)
+    for e in (Estado.PRODUZINDO, Estado.EM_REVISAO, Estado.APROVADO):
+        fila.mudar_estado(con, aprovado.id, e)
     assert fila.proximo_para_produzir(con).id == cedo.id
-    assert tarde.id != cedo.id
+    fila.mudar_estado(con, cedo.id, Estado.DESCARTADO)
+    # job parado em `em_revisao` (erro ou limite na revisão) é retomado
+    for e in (Estado.PRODUZINDO, Estado.EM_REVISAO):
+        fila.mudar_estado(con, em_revisao.id, e)
+    assert fila.proximo_para_produzir(con).id == em_revisao.id
+    fila.mudar_estado(con, em_revisao.id, Estado.FALHOU)
+    assert fila.proximo_para_produzir(con).id == tarde.id
 
 
 def test_proximo_vazio(con):
