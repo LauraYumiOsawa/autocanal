@@ -31,7 +31,10 @@ def garantir(
 ) -> None:
     if _saudavel(url_saude, obter):
         return
-    executar([*_compose(nome, raiz), "up", "-d"], check=True, capture_output=True)
+    try:
+        executar([*_compose(nome, raiz), "up", "-d"], check=True, capture_output=True)
+    except (subprocess.CalledProcessError, OSError) as e:
+        raise ErroProvedor(f"não consegui subir o serviço {nome}: {type(e).__name__}") from None
     limite = time.monotonic() + timeout_s
     while time.monotonic() < limite:
         if _saudavel(url_saude, obter):

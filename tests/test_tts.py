@@ -1,4 +1,5 @@
 import base64
+import subprocess
 import wave
 from pathlib import Path
 
@@ -178,3 +179,45 @@ def test_kokoro_real_pt_br(cfg, midia, tmp_path):
         assert midia.info(arq).duracao > 1.0
     finally:
         servicos.parar("kokoro", cfg_real.raiz)
+
+
+def _obter_recusado(url, timeout=None):
+    raise requests.ConnectionError("recusada")
+
+
+def test_garantir_docker_falha_vira_erro_provedor(tmp_path):
+    for erro in (
+        subprocess.CalledProcessError(1, "docker", stderr=b"detalhe longo"),
+        FileNotFoundError("docker"),
+    ):
+        def executar(cmd, **kw):
+            raise erro
+
+        with pytest.raises(ErroProvedor) as e:
+            servicos.garantir(
+                "kokoro", tmp_path, "http://x/health", executar=executar, obter=_obter_recusado
+            )
+        assert "detalhe longo" not in str(e.value)
+
+
+def test_kokoro_gerenciado_com_docker_ausente_usa_reserva(cfg, tmp_path, monkeypatch):
+    garantir_real = servicos.garantir
+
+    def executar(cmd, **kw):
+        raise FileNotFoundError("docker")
+
+    monkeypatch.setattr(
+        servicos, "garantir",
+        lambda nome, raiz, url, **kw: garantir_real(
+            nome, raiz, url, executar=executar, obter=_obter_recusado
+        ),
+    )
+    canal = cfg.canais["teste"].model_copy(
+        update={"tts": cfg.canais["teste"].tts.model_copy(
+            update={"provedor": "kokoro", "voz": "pf_dora", "reserva": "falso"})}
+    )
+    tts = criar_tts(cfg, canal)
+    assert isinstance(tts.principal, KokoroTTS)
+    tts.sintetizar("oi", tmp_path / "a.wav")
+    assert tts.usou_reserva is True
+    assert tts.nome == "falso"
