@@ -94,8 +94,16 @@ def test_vetar_mantem_made_for_kids():
     upload.vetar(yt, "abc")
     yt.videos.return_value.update.assert_called_once_with(
         part="status",
-        body={"id": "abc", "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False}},
+        body={"id": "abc", "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False,
+                                      "containsSyntheticMedia": False}},
     )
+
+
+def test_vetar_repassa_sintetico():
+    yt = MagicMock()
+    upload.vetar(yt, "abc", True)
+    corpo = yt.videos.return_value.update.call_args.kwargs["body"]
+    assert corpo["status"]["containsSyntheticMedia"] is True
 
 
 def test_vetar_cota():
@@ -118,5 +126,46 @@ def test_status():
     yt.videos.return_value.list.return_value.execute.return_value = {
         "items": [{"id": "a", "status": {"privacyStatus": "public"}}]
     }
-    assert upload.status(yt, ["a", "b"]) == {"a": "public"}
+    assert upload.status(yt, ["a", "b"]) == {"a": {
+        "privacyStatus": "public", "uploadStatus": None, "rejectionReason": None, "failureReason": None}}
+    assert yt.videos.return_value.list.call_args.kwargs["part"] == "status"
     assert upload.status(yt, []) == {}
+
+
+def test_enviar_refresh_error_vira_auth_expirada(tmp_path):
+    from google.auth.exceptions import RefreshError
+    from autocanal.youtube.oauth import AuthExpirada
+
+    yt = _yt(RefreshError("invalid_grant"))
+    with pytest.raises(AuthExpirada):
+        upload.enviar(yt, tmp_path / "v", {}, dormir=MagicMock(), media_factory=MagicMock())
+
+
+def test_enviar_transport_error_retenta(tmp_path):
+    from google.auth.exceptions import TransportError
+
+    yt = _yt(TransportError("rede"), (None, {"id": "t"}))
+    assert upload.enviar(yt, tmp_path / "v", {}, dormir=MagicMock(), media_factory=MagicMock()) == "t"
+
+
+def test_refresh_error_em_chamadas_simples():
+    from google.auth.exceptions import RefreshError
+    from autocanal.youtube.oauth import AuthExpirada
+
+    yt = MagicMock()
+    yt.videos.return_value.list.return_value.execute.side_effect = RefreshError("x")
+    yt.videos.return_value.update.return_value.execute.side_effect = RefreshError("x")
+    yt.thumbnails.return_value.set.return_value.execute.side_effect = RefreshError("x")
+    with pytest.raises(AuthExpirada):
+        upload.status(yt, ["a"])
+    with pytest.raises(AuthExpirada):
+        upload.vetar(yt, "a")
+    with pytest.raises(AuthExpirada):
+        upload.definir_thumbnail(yt, "a", Path("x.png"), media_factory=MagicMock())
+
+
+def test_cota_carrega_motivo(tmp_path):
+    yt = _yt(_erro(403, "uploadLimitExceeded"))
+    with pytest.raises(upload.CotaEsgotada) as ei:
+        upload.enviar(yt, tmp_path / "v", {}, dormir=MagicMock(), media_factory=MagicMock())
+    assert ei.value.motivo == "uploadLimitExceeded"

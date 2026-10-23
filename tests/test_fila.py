@@ -120,3 +120,8 @@ def test_conectar_idempotente(tmp_path):
     nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
     assert {"jobs", "etapas", "revisoes", "canais_estado", "cota", "metricas",
             "temas", "chamadas_claude"} <= nomes
+
+
+def test_transicoes_falha_youtube_e_reaprovacao():
+    assert Estado.FALHOU in fila.TRANSICOES[Estado.AGENDADO]
+    assert Estado.APROVADO in fila.TRANSICOES[Estado.FALHOU]

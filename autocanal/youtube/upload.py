@@ -6,15 +6,22 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+from google.auth.exceptions import RefreshError, TransportError
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
+
+from autocanal.youtube.oauth import AuthExpirada
 
 _RETENTAVEIS = {500, 502, 503, 504}
 _RAZOES_COTA = {"quotaExceeded", "uploadLimitExceeded", "dailyLimitExceeded"}
 
 
 class CotaEsgotada(Exception):
-    pass
+    """Cota diária (quotaExceeded/dailyLimitExceeded) ou limite do canal (uploadLimitExceeded)."""
+
+    def __init__(self, mensagem: str = "", motivo: str | None = None):
+        super().__init__(mensagem)
+        self.motivo = motivo
 
 
 class ErroUpload(Exception):
@@ -55,8 +62,9 @@ def _razoes(e: HttpError) -> set[str]:
 
 
 def _traduzir(e: HttpError) -> Exception:
-    if _razoes(e) & _RAZOES_COTA:
-        return CotaEsgotada(str(e))
+    motivos = _razoes(e) & _RAZOES_COTA
+    if motivos:
+        return CotaEsgotada(str(e), motivo=sorted(motivos)[0])
     return ErroUpload(str(e))
 
 
@@ -65,6 +73,10 @@ def _executar(requisicao):
         return requisicao.execute()
     except HttpError as e:
         raise _traduzir(e) from e
+    except RefreshError as e:
+        raise AuthExpirada(str(e)) from e
+    except TransportError as e:
+        raise ErroUpload(str(e)) from e
 
 
 def enviar(
@@ -84,12 +96,15 @@ def enviar(
         try:
             _, resposta = req.next_chunk()
         except HttpError as e:
-            if _razoes(e) & _RAZOES_COTA:
-                raise CotaEsgotada(str(e)) from e
+            traduzido = _traduzir(e)
+            if isinstance(traduzido, CotaEsgotada):
+                raise traduzido from e
             if e.resp.status not in _RETENTAVEIS:
                 raise ErroUpload(str(e)) from e
             erro: Exception = e
-        except OSError as e:
+        except RefreshError as e:
+            raise AuthExpirada(str(e)) from e
+        except (OSError, TransportError) as e:
             erro = e
         else:
             if resposta is not None:
@@ -109,23 +124,31 @@ def definir_thumbnail(youtube, video_id: str, imagem: Path, *, media_factory=Med
     )
 
 
-def vetar(youtube, video_id: str) -> None:
-    # update substitui a parte "status" inteira: manter madeForKids explícito evita 400
+def vetar(youtube, video_id: str, sintetico: bool = False) -> None:
+    # update substitui a parte "status" inteira: reenviar madeForKids e o rótulo de mídia sintética
     _executar(
         youtube.videos().update(
             part="status",
             body={
                 "id": video_id,
-                "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False},
+                "status": {
+                    "privacyStatus": "private",
+                    "selfDeclaredMadeForKids": False,
+                    "containsSyntheticMedia": sintetico,
+                },
             },
         )
     )
 
 
-def status(youtube, ids: list[str]) -> dict[str, str]:
-    saida: dict[str, str] = {}
+def status(youtube, ids: list[str]) -> dict[str, dict]:
+    saida: dict[str, dict] = {}
     for i in range(0, len(ids), 50):
         r = _executar(youtube.videos().list(part="status", id=",".join(ids[i : i + 50])))
         for item in r.get("items", []):
-            saida[item["id"]] = item["status"]["privacyStatus"]
+            st = item.get("status", {})
+            saida[item["id"]] = {
+                k: st.get(k)
+                for k in ("privacyStatus", "uploadStatus", "rejectionReason", "failureReason")
+            }
     return saida

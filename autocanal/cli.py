@@ -1,6 +1,7 @@
 """Interface de linha de comando do autocanal."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from datetime import UTC, datetime
@@ -79,11 +80,13 @@ def auth(ctx: typer.Context, canal: str, porta: int = typer.Option(8080, "--port
     if canal not in cfg.canais:
         typer.echo(f"canal desconhecido: {canal}", err=True)
         raise typer.Exit(1)
-    creds = oauth.autorizar(cfg.client_secret, cfg.dados / "tokens" / f"{canal}.json", porta)
+    token = cfg.dados / "tokens" / f"{canal}.json"
+    creds = oauth.autorizar(cfg.client_secret, token, porta)
     try:
         canal_id, titulo = oauth.canal_autenticado(oauth.cliente(creds))
-    except oauth.AuthExpirada as e:
-        typer.echo(f"falha: {e}", err=True)
+    except Exception as e:
+        token.unlink(missing_ok=True)  # token não verificado nunca fica utilizável
+        typer.echo(f"falha: {type(e).__name__}: {e}", err=True)
         raise typer.Exit(1)
     con = conectar(cfg.dados / "autocanal.db")
     con.execute(
@@ -124,7 +127,12 @@ def vetar(ctx: typer.Context, job: str) -> None:
         typer.echo(f"só jobs agendados podem ser vetados (estado: {j.estado.value})", err=True)
         raise typer.Exit(1)
     try:
-        upload.vetar(publicador.youtube_real(cfg)(j.canal), j.youtube_video_id)
+        meta = json.loads((cfg.dados / "jobs" / j.id / "metadados.json").read_text(encoding="utf-8"))
+        sintetico = bool(meta.get("sintetico"))
+    except (OSError, ValueError):
+        sintetico = False
+    try:
+        upload.vetar(publicador.youtube_real(cfg)(j.canal), j.youtube_video_id, sintetico)
     except (oauth.AuthExpirada, upload.CotaEsgotada, upload.ErroUpload) as e:
         typer.echo(f"falha ao vetar no YouTube: {e}", err=True)
         raise typer.Exit(1)

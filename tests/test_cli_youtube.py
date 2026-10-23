@@ -22,12 +22,17 @@ def _agendado(cfg):
 
 def test_vetar(cfg, raiz_teste, monkeypatch):
     con, j = _agendado(cfg)
+    pasta = cfg.dados / "jobs" / j.id
+    pasta.mkdir(parents=True)
+    (pasta / "metadados.json").write_text('{"sintetico": true}')
     yt = MagicMock()
     monkeypatch.setattr(cli.publicador, "youtube_real", lambda c: (lambda canal: yt))
     r = runner.invoke(cli.app, ["--raiz", str(raiz_teste), "vetar", j.id])
     assert r.exit_code == 0, r.output
     assert fila.obter(con, j.id).estado == Estado.VETADO
     assert yt.videos.return_value.update.call_args.kwargs["body"]["id"] == "abc"
+    corpo = yt.videos.return_value.update.call_args.kwargs["body"]
+    assert corpo["status"]["containsSyntheticMedia"] is True
 
 
 def test_vetar_so_agendado(cfg, raiz_teste):
@@ -60,3 +65,24 @@ def test_publicar_job(cfg, raiz_teste, monkeypatch):
     monkeypatch.setattr(cli.publicador, "youtube_real", lambda c: None)
     r = runner.invoke(cli.app, ["--raiz", str(raiz_teste), "publicar", "--job", "x"])
     assert r.exit_code == 0 and chamado["job_id"] == "x" and "v1" in r.output
+
+
+def test_auth_verificacao_falha_remove_token(cfg, raiz_teste, monkeypatch):
+    from autocanal.youtube import oauth
+
+    token = cfg.dados / "tokens" / "teste.json"
+
+    def autorizar(cs, destino, porta=8080):
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_text("SEGREDO")
+        return MagicMock()
+
+    def sem_canal(yt):
+        raise oauth.AuthExpirada("conta sem canal")
+
+    monkeypatch.setattr(cli.oauth, "autorizar", autorizar)
+    monkeypatch.setattr(cli.oauth, "cliente", lambda c: "yt")
+    monkeypatch.setattr(cli.oauth, "canal_autenticado", sem_canal)
+    r = runner.invoke(cli.app, ["--raiz", str(raiz_teste), "auth", "teste"])
+    assert r.exit_code == 1 and not token.exists() and "SEGREDO" not in r.output
+    assert conectar(cfg.dados / "autocanal.db").execute("SELECT * FROM canais_estado").fetchall() == []
