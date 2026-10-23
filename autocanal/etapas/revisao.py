@@ -10,6 +10,7 @@ from autocanal.etapas.base import (
     PROBLEMAS_REVISAO,
     Contexto,
     carregar_prompt,
+    etapas_a_refazer,
     gravar_json,
     ler_json,
     lista_md,
@@ -233,10 +234,7 @@ def executar(ctx: Contexto) -> None:
     else:
         # refaz da etapa mais cedo até a própria revisão (zera as tentativas dela também)
         gravar_json(ctx, PROBLEMAS_REVISAO, {"problemas": problemas})
-        ordem = ctx.formato.etapas
-        fila.resetar_etapas(
-            ctx.con, job.id, list(ordem[ordem.index(etapa):ordem.index(NOME) + 1])
-        )
+        fila.resetar_etapas(ctx.con, job.id, etapas_a_refazer(ctx.formato.etapas, etapa))
         novo = Estado.PRODUZINDO
     fila.atualizar(ctx.con, job.id, tentativas_revisao=rodada)
     fila.mudar_estado(ctx.con, job.id, novo)

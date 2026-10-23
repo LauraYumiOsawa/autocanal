@@ -10,7 +10,12 @@ from pathlib import Path
 from autocanal import etapas, fila
 from autocanal.claude import ErroClaudeIndisponivel, LimiteUsoClaude
 from autocanal.config import Config
-from autocanal.etapas.base import PROBLEMAS_REVISAO, ErroEtapa, contexto_para
+from autocanal.etapas.base import (
+    PROBLEMAS_REVISAO,
+    ErroEtapa,
+    contexto_para,
+    etapas_a_refazer,
+)
 from autocanal.fila import Estado, Job
 from autocanal.formatos import FORMATOS
 from autocanal.servicos import ServicoIndisponivel
@@ -194,9 +199,7 @@ def preparar_refazer(cfg: Config, con: sqlite3.Connection, job_id: str) -> Job:
                        ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        fila.resetar_etapas(
-            con, job_id, list(ordem[ordem.index(etapa):ordem.index("revisao") + 1])
-        )
+        fila.resetar_etapas(con, job_id, etapas_a_refazer(ordem, etapa))
         fila.atualizar(con, job_id, tentativas_revisao=0)
         return fila.mudar_estado(con, job_id, Estado.PRODUZINDO)
     return job

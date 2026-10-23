@@ -270,6 +270,32 @@ def test_legendas_sem_palavras_falha(ctx, monkeypatch):
         legendas.executar(ctx)
 
 
+def test_visuais_refazer_nao_repete_midias_anteriores(ctx, monkeypatch):
+    from autocanal.provedores.imagens import MidiaObtida
+
+    vistos: list[set[str]] = []
+
+    class Banco:
+        nome = "banco"
+
+        def buscar(self, consulta, orientacao, destino_sem_ext, excluir):
+            vistos.append(set(excluir))
+            url = next(f"https://b/{i}" for i in range(100) if f"https://b/{i}" not in excluir)
+            caminho = Path(str(destino_sem_ext) + ".png")
+            caminho.write_bytes(b"x")
+            return MidiaObtida(caminho, "imagem", "banco", url, "livre", "autor")
+
+    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a: [Banco()])
+    _segmentos(ctx, ["a b", "c d"])
+    visuais.executar(ctx)
+    primeira = [f["url"] for f in ler_json(ctx, "fontes_midia.json")]
+    assert primeira == ["https://b/0", "https://b/1"]
+    visuais.executar(ctx)  # a revisão pediu para refazer os visuais
+    segunda = [f["url"] for f in ler_json(ctx, "fontes_midia.json")]
+    assert segunda == ["https://b/2", "https://b/3"]
+    assert vistos[2] == set(primeira)
+
+
 def test_visuais_um_por_segmento_sem_repetir(ctx):
     _segmentos(ctx, ["a b", "c d", "e f"], ["ocean waves", "city night", "pine forest"])
     visuais.executar(ctx)

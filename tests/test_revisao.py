@@ -251,13 +251,24 @@ def test_reprovado_primeira_rodada_refaz(ctx, cfg, con, claude_falso):
 
     j = fila.obter(con, ctx.job.id)
     assert j.estado == Estado.PRODUZINDO and j.tentativas_revisao == 1
+    # metadados não muda com visuais novos: fica `ok`
     assert [fila.estado_etapa(con, j.id, n) for n in ETAPAS] == [
-        "ok", "ok", "ok", None, None, None, None,
+        "ok", "ok", "ok", None, None, "ok", None,
     ]
     assert fila.tentativas_etapa(con, j.id, "revisao") == 0
     assert ler_json(ctx, "problemas_revisao.json") == {"problemas": ["imagem não combina"]}
     assert _revisoes(con, j.id) == [(1, 0, '["imagem não combina"]', "visuais")]
     assert ler_json(ctx, "metadados.json")["sintetico"] is False
+
+
+def test_etapas_a_refazer():
+    from autocanal.etapas.base import etapas_a_refazer
+
+    ordem = ("roteiro", "narracao", "legendas", "visuais", "render", "metadados", "revisao")
+    assert etapas_a_refazer(ordem, "roteiro") == list(ordem)
+    assert etapas_a_refazer(ordem, "legendas") == ["legendas", "visuais", "render", "revisao"]
+    assert etapas_a_refazer(ordem, "render") == ["render", "revisao"]
+    assert etapas_a_refazer(ordem, "metadados") == ["metadados", "revisao"]
 
 
 def test_reprovado_sem_etapa_refaz_tudo(ctx, cfg, con, claude_falso):
@@ -309,8 +320,9 @@ def test_reprovacao_refaz_so_as_etapas_resetadas(ctx, cfg, con, claude_falso):
         return lambda c: chamadas.append(nome)
 
     registro = {n: falsa(n) for n in ETAPAS} | {"revisao": revisao.executar}
+    fila.resetar_etapas(con, ctx.job.id, ["revisao"])  # o fixture a deixa `rodando`
     assert produzir(cfg, con, ctx.job.id, registro=registro) == Estado.APROVADO
-    assert chamadas == ["visuais", "render", "metadados"]
+    assert chamadas == ["visuais", "render"]  # metadados não depende dos visuais
     assert len(claude_falso.chamadas()) == 2
     j = fila.obter(con, ctx.job.id)
     assert j.tentativas_revisao == 2
