@@ -1,0 +1,6 @@
+:root { --fundo:#ffffff; --texto:#1f2328; --suave:#57606a; --link:#0969da; }
+@media (prefers-color-scheme: dark) { :root { --fundo:#0d1117; --texto:#e6edf3; --suave:#9198a1; --link:#4493f8; } }
+body { margin:0; background:var(--fundo); color:var(--texto); font:16px/1.6 system-ui, sans-serif; }
+main { max-width:720px; margin:0 auto; padding:32px 16px 64px; }
+h1 { font-size:1.8rem; margin-bottom:4px; } h2 { font-size:1.2rem; margin-top:28px; }
+a { color:var(--link); } .data { color:var(--suave); margin-top:0; } nav { margin-bottom:24px; }
