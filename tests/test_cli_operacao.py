@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -184,6 +185,16 @@ def test_tick_liga_as_fases_reais(cfg, rodar, monkeypatch):
     assert recebido["publicar_fn"](cfg, None, quando) == ["v9"]
     recebido["sincronizar_fn"](cfg, None, quando)
     assert chamadas == {"publicar": (quando, "yt"), "sincronizar": (quando, "yt")}
+
+
+def test_tick_configura_log_info(cfg, rodar, monkeypatch):
+    niveis = []
+    monkeypatch.setattr(cli.logging, "basicConfig", lambda **kw: niveis.append(kw["level"]))
+    monkeypatch.setattr(cli.agendador, "tick",
+                        lambda *a, **k: agendador.ResumoTick(False, 0, None, [], [], None))
+    monkeypatch.setattr(cli.publicador, "youtube_real", lambda c: "yt")
+    assert rodar("tick").exit_code == 0
+    assert niveis == [logging.INFO]
 
 
 def test_tick_pulado_pela_trava_sai_com_2(cfg, rodar):

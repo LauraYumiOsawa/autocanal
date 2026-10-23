@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 from collections.abc import Iterator
@@ -398,6 +399,8 @@ def _resumo_e_aviso(cfg: Config, con, dia) -> Path:
 @app.command()
 def tick(ctx: typer.Context) -> None:
     """Um passo do agendador (o timer roda a cada 15 min)."""
+    # avisos e pausas do agendador/produtor vão para o journal do systemd
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     cfg = carregar(ctx.obj)
     con = conectar(cfg.dados / "autocanal.db")
     youtube = publicador.youtube_real(cfg)
