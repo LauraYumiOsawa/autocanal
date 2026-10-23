@@ -121,9 +121,11 @@ def publicar_aprovados(
             # upload já feito numa rodada anterior que falhou ao gravar o estado: não reenviar
             _agendar(con, job.id, job.youtube_video_id)
             continue
-        canal = cfg.canais[job.canal]
         pasta = cfg.dados / "jobs" / job.id
         try:
+            canal = cfg.canais.get(job.canal)
+            if canal is None:
+                raise KeyError(f"canal {job.canal!r} não está em config/canais.yaml")
             meta = json.loads((pasta / "metadados.json").read_text(encoding="utf-8"))
             if not (pasta / "video.mp4").is_file():
                 raise FileNotFoundError("video.mp4")

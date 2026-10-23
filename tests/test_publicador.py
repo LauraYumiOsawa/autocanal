@@ -81,6 +81,16 @@ def test_publicar_envia_e_agenda(cfg, con, envios):
     publicador.upload.definir_thumbnail.assert_not_called()
 
 
+def test_publicar_canal_removido_da_config_falha_o_job(cfg, con, envios):
+    sumiu = _aprovado(cfg, con, AGORA + timedelta(days=2), canal="antigo")
+    ok = _aprovado(cfg, con, AGORA + timedelta(days=3))
+    yt = MagicMock()
+    assert _pub(cfg, con, lambda c: yt) == ["vid1"]
+    j = fila.obter(con, sumiu.id)
+    assert j.estado == Estado.FALHOU and "antigo" in j.erro
+    assert fila.obter(con, ok.id).estado == Estado.AGENDADO
+
+
 def test_publicar_thumbnail_so_nao_short(cfg, con, envios):
     cfg.canais["teste"].grade.append(type(cfg.canais["teste"].grade[0])(formato="longo", dias=["seg"], hora="12:00"))
     _aprovado(cfg, con, AGORA + timedelta(days=2), formato="longo", thumb=True)
