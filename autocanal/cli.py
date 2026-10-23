@@ -438,6 +438,8 @@ Environment=PATH={local_bin}:/usr/local/bin:/usr/bin:/bin
 ExecStart="{exe}" --raiz "{raiz}" tick
 # 2 = tick pulado porque outro processo do autocanal segura a trava: não é falha
 SuccessExitStatus=2
+# produção travada: o systemd mata o tick; a etapa `rodando` conta como tentativa
+TimeoutStartSec=2h
 """
 
 _TIMER = """\

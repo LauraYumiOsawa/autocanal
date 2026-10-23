@@ -80,7 +80,7 @@ def _tick(cfg, con, fases, agora=AGORA):
 def test_tick_ordem_das_fases(cfg_nicho, con):
     fases = Fases()
     r = _tick(cfg_nicho, con, fases)
-    assert fases.ordem == ["planejar", "produzir", "publicar", "sincronizar", "resumo"]
+    assert fases.ordem == ["publicar", "sincronizar", "resumo", "planejar", "produzir"]
     job = fila.listar(con)[0]
     assert fases.horarios["produzido"] == job.id
     assert r == agendador.ResumoTick(
@@ -146,7 +146,7 @@ def test_tick_so_planeja_com_fila_curta(cfg_nicho, con):
     fila.mudar_estado(con, j.id, Estado.FALHOU)
     fases = Fases()
     _tick(cfg_nicho, con, fases)
-    assert fases.ordem[0] == "planejar"
+    assert "planejar" in fases.ordem
 
 
 def test_tick_canal_sem_nicho_nao_planeja(cfg, con):
@@ -170,7 +170,7 @@ def test_tick_fase_com_erro_nao_impede_as_outras(cfg_nicho, con, caplog):
     fases.falhar = {"planejar", "produzir", "publicar"}
     fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
     r = _tick(cfg_nicho, con, fases)
-    assert fases.ordem == ["planejar", "produzir", "publicar", "sincronizar", "resumo"]
+    assert fases.ordem == ["publicar", "sincronizar", "resumo", "planejar", "produzir"]
     assert r.enviados == [] and r.publicados == ["job-publicado"]
     assert "publicar quebrou" in caplog.text
     with agendador.trava(cfg_nicho.dados / "tick.lock"):  # trava foi solta
@@ -213,7 +213,7 @@ def test_tick_limite_do_claude_no_planejamento_pausa(cfg_nicho, con):
     agora = AGORA.astimezone(UTC)
     r = agendador.tick(cfg_nicho, con, agora, relogio=lambda: agora,
                        **{**fases.kwargs(), "planejar_fn": planejar})
-    assert fases.ordem == ["planejar", "publicar", "sincronizar", "resumo"]
+    assert fases.ordem == ["publicar", "sincronizar", "resumo", "planejar"]
     assert r.produzido is None
     assert produtor.pausa_claude_ate(cfg_nicho) == AGORA.astimezone(UTC) + timedelta(hours=1)
 
@@ -223,18 +223,19 @@ def test_tick_publica_com_relogio_atualizado(cfg_nicho, con):
     t = [agora]
     fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
     fases = Fases()
-    produzir_original = fases.produzir
+    publicar_original = fases.publicar
 
-    def produzir_demorado(cfg, con, job_id):
-        t[0] += timedelta(minutes=20)  # a produção levou 20 minutos
-        return produzir_original(cfg, con, job_id)
+    def publicar_demorado(cfg, con, quando):
+        r = publicar_original(cfg, con, quando)
+        t[0] += timedelta(minutes=20)  # o envio levou 20 minutos
+        return r
 
     agendador.tick(cfg_nicho, con, agora, relogio=lambda: t[0],
-                   **{**fases.kwargs(), "produzir_fn": produzir_demorado})
+                   **{**fases.kwargs(), "publicar_fn": publicar_demorado})
     depois = agora + timedelta(minutes=20)
-    assert fases.horarios["planejar"] == agora
-    assert fases.horarios["publicar"] == depois
+    assert fases.horarios["publicar"] == agora
     assert fases.horarios["sincronizar"] == depois
+    assert fases.horarios["planejar"] == agora  # o planejamento usa o início do tick
 
 
 def test_tick_relogio_padrao_e_o_real(cfg_nicho, con):

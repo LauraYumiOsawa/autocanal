@@ -103,11 +103,11 @@ def tick(
 ) -> ResumoTick:
     """Um passo do agendador, dentro da trava `dados/tick.lock`.
 
-    (1) planeja se a fila estiver curta; (2) produz o próximo job; (3) envia os
-    aprovados; (4) sincroniza os publicados; (5) gera o resumo do dia a partir das
-    07:00 locais, uma vez. O planejamento usa `agora` (início do tick); as fases
-    seguintes leem `relogio()` na hora, porque a produção pode levar dezenas de
-    minutos. Planejar espera a pausa do Claude e o recuo após falha
+    (1) envia os aprovados; (2) sincroniza os publicados; (3) gera o resumo do dia a
+    partir das 07:00 locais, uma vez; (4) planeja se a fila estiver curta; (5) produz o
+    próximo job. Publicar e resumir vêm antes da produção, que pode levar dezenas de
+    minutos (ou travar). O planejamento usa `agora` (início do tick); as outras fases
+    leem `relogio()` na hora. Planejar espera a pausa do Claude e o recuo após falha
     (`planejador.planejar_apos`); produzir espera a pausa. Erro numa fase é
     registrado no log e não impede as seguintes.
     """
@@ -123,6 +123,23 @@ def tick(
 def _passo(cfg, con, agora, relogio, planejar_fn, produzir_fn, publicar_fn, sincronizar_fn,
            resumo_fn) -> ResumoTick:
     r = ResumoTick(pulou_por_trava=False)
+    try:
+        r.enviados = list(publicar_fn(cfg, con, relogio()))
+    except Exception:
+        log.exception("tick: falha ao publicar")
+
+    try:
+        r.publicados = list(sincronizar_fn(cfg, con, relogio()))
+    except Exception:
+        log.exception("tick: falha ao sincronizar")
+
+    try:
+        local = relogio().astimezone(ZoneInfo(cfg.fuso))
+        if local.time() >= HORA_RESUMO and not relatorio.caminho_resumo(cfg, local.date()).exists():
+            r.resumo = resumo_fn(cfg, con, local.date())
+    except Exception:
+        log.exception("tick: falha ao gerar o resumo")
+
     try:
         if (_claude_livre(cfg, agora) and _planejar_liberado(cfg, agora)
                 and fila_curta(cfg, con, agora)):
@@ -144,21 +161,4 @@ def _passo(cfg, con, agora, relogio, planejar_fn, produzir_fn, publicar_fn, sinc
             produzir_fn(cfg, con, job.id)
     except Exception:
         log.exception("tick: falha ao produzir")
-
-    try:
-        r.enviados = list(publicar_fn(cfg, con, relogio()))
-    except Exception:
-        log.exception("tick: falha ao publicar")
-
-    try:
-        r.publicados = list(sincronizar_fn(cfg, con, relogio()))
-    except Exception:
-        log.exception("tick: falha ao sincronizar")
-
-    try:
-        local = relogio().astimezone(ZoneInfo(cfg.fuso))
-        if local.time() >= HORA_RESUMO and not relatorio.caminho_resumo(cfg, local.date()).exists():
-            r.resumo = resumo_fn(cfg, con, local.date())
-    except Exception:
-        log.exception("tick: falha ao gerar o resumo")
     return r

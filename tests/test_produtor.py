@@ -139,6 +139,25 @@ def test_produzir_queda_geral_pausa_sem_contar_tentativa(cfg, con, job, erro):
     assert pausa_claude_ate(cfg) is None
 
 
+def test_produzir_etapa_rodando_conta_como_interrompida(cfg, con, job):
+    chamadas: list[str] = []
+    reg = _registro(chamadas)
+    fila.marcar_etapa(con, job.id, "roteiro", "rodando")  # processo anterior morreu
+    assert produzir(cfg, con, job.id, registro=reg) == Estado.APROVADO
+    assert fila.tentativas_etapa(con, job.id, "roteiro") == 1
+    assert chamadas[0] == "roteiro"
+
+
+def test_produzir_interrompida_tres_vezes_falha(cfg, con, job):
+    chamadas: list[str] = []
+    for _ in range(MAX_TENTATIVAS_ETAPA - 1):
+        fila.marcar_etapa(con, job.id, "narracao", "erro", "interrompida")
+    fila.marcar_etapa(con, job.id, "narracao", "rodando")
+    assert produzir(cfg, con, job.id, registro=_registro(chamadas)) == Estado.FALHOU
+    assert "narracao: interrompida" in fila.obter(con, job.id).erro
+    assert chamadas == []
+
+
 def test_pausa_claude_ate_ilegivel(cfg):
     cfg.dados.mkdir(parents=True, exist_ok=True)
     (cfg.dados / "pausa_claude_ate").write_text("lixo")

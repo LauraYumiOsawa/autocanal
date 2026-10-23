@@ -91,6 +91,14 @@ def produzir(
         ctx = contexto_para(cfg, con, job)
     except ErroEtapa as e:
         return fila.mudar_estado(con, job_id, Estado.FALHOU, erro=str(e)).estado
+    for nome in ctx.formato.etapas:
+        # `rodando` no início = o processo anterior morreu (crash/timeout): conta tentativa
+        if fila.estado_etapa(con, job_id, nome) == "rodando":
+            fila.marcar_etapa(con, job_id, nome, "erro", "interrompida")
+            log.warning("etapa %s/%s estava rodando: contada como interrompida", job_id, nome)
+            if fila.tentativas_etapa(con, job_id, nome) >= MAX_TENTATIVAS_ETAPA:
+                erro = f"{nome}: interrompida {MAX_TENTATIVAS_ETAPA} vezes"
+                return fila.mudar_estado(con, job_id, Estado.FALHOU, erro=erro).estado
 
     refazer = True
     while refazer:
