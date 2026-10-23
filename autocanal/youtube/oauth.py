@@ -26,10 +26,19 @@ def salvar(creds, token: Path) -> None:
     if not token.parent.exists():
         token.parent.mkdir(parents=True, mode=0o700)
         token.parent.chmod(0o700)
-    fd = os.open(token, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(creds.to_json())
-    token.chmod(0o600)  # o modo de open() não vale para arquivo já existente
+    # grava num temporário 600 e troca de uma vez: um crash não deixa o token truncado
+    tmp = token.with_name(f".{token.name}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(creds.to_json())
+            f.flush()
+            os.fsync(f.fileno())
+        tmp.chmod(0o600)  # o modo de open() não vale para arquivo já existente
+        os.replace(tmp, token)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def autorizar(

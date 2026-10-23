@@ -20,6 +20,18 @@ def test_salvar_chmod_600(tmp_path):
     assert token.read_text() == '{"a": 1}'
 
 
+def test_salvar_atomico_nao_trunca_token_em_falha(tmp_path):
+    token = tmp_path / "tokens" / "teste.json"
+    creds = MagicMock()
+    creds.to_json.return_value = '{"a": 1}'
+    oauth.salvar(creds, token)
+    creds.to_json.side_effect = RuntimeError("quebrou")
+    with pytest.raises(RuntimeError):
+        oauth.salvar(creds, token)
+    assert token.read_text() == '{"a": 1}'
+    assert sorted(p.name for p in token.parent.iterdir()) == ["teste.json"]
+
+
 def test_carregar_refresh_error_vira_auth_expirada(tmp_path):
     token = tmp_path / "t.json"
     token.write_text("{}")
