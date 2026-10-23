@@ -7,13 +7,13 @@ from autocanal.etapas.base import (
     ErroEtapa,
     carregar_prompt,
     gravar_json,
-    ler_json,
+    lista_md,
     perfil_voz,
+    problemas_revisao,
     titulos_recentes,
 )
 from autocanal.texto import contar_palavras
 
-PROBLEMAS = "problemas_revisao.json"
 FERRAMENTAS = ["Skill", "Read", "Bash(python3:*)", "WebSearch", "WebFetch"]
 
 _TEXTO = {"type": "string"}
@@ -49,26 +49,16 @@ ROTEIRO_SHORT = {
 }
 
 
-def _lista(itens: list[str], vazio: str) -> str:
-    return "\n".join(f"- {i}" for i in itens) if itens else vazio
-
-
-def _problemas_anteriores(ctx: Contexto) -> list[str]:
-    if not (ctx.pasta / PROBLEMAS).exists():
-        return []
-    return [str(p) for p in ler_json(ctx, PROBLEMAS).get("problemas", [])]
-
-
 def executar(ctx: Contexto) -> None:
     fmt = ctx.formato
     prompt = carregar_prompt(
         "roteiro_short",
         tema=ctx.job.tema,
         perfil_voz=perfil_voz(ctx),
-        titulos_recentes=_lista(titulos_recentes(ctx), "(nenhum ainda)"),
+        titulos_recentes=lista_md(titulos_recentes(ctx), "(nenhum ainda)"),
         palavras_min=fmt.palavras_min,
         palavras_max=fmt.palavras_max,
-        problemas_anteriores=_lista(_problemas_anteriores(ctx), "Nenhum: esta é a primeira versão."),
+        problemas_anteriores=lista_md(problemas_revisao(ctx), "Nenhum: esta é a primeira versão."),
         dir_plugin=ctx.cfg.plugin_dir,
     )
     r = claude.chamar(

@@ -21,7 +21,8 @@ def produzir(
     Etapas já `ok` são puladas. Um erro conta uma tentativa da etapa e encerra a
     chamada (após `MAX_TENTATIVAS_ETAPA`, o job vai para `falhou`); o limite de uso do
     Claude encerra sem contar tentativa. Se a revisão devolver o job para
-    `produzindo`, o percurso recomeça na mesma chamada.
+    `produzindo`, o percurso recomeça na mesma chamada; se ela terminar sem decidir
+    (job ainda `em_revisao`), conta como erro da etapa.
     """
     registro = etapas.REGISTRO if registro is None else registro
     job = fila.obter(con, job_id)
@@ -49,6 +50,8 @@ def produzir(
                 if etapa is None:
                     raise ErroEtapa(f"etapa não implementada: {nome}")
                 etapa(ctx)
+                if nome == "revisao" and fila.obter(con, job_id).estado == Estado.EM_REVISAO:
+                    raise ErroEtapa("revisão não decidiu")
             except LimiteUsoClaude:
                 return fila.obter(con, job_id).estado
             except Exception as e:

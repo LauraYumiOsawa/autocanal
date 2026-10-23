@@ -124,6 +124,19 @@ def test_produzir_refazer_volta_a_produzir(cfg, con, job):
     assert fila.estado_etapa(con, job.id, "revisao") == "ok"
 
 
+def test_produzir_revisao_que_nao_decide_conta_tentativa(cfg, con, job):
+    chamadas: list[str] = []
+    reg = _registro(chamadas, revisao=lambda ctx: chamadas.append("revisao"))
+    assert produzir(cfg, con, job.id, registro=reg) == Estado.EM_REVISAO
+    assert fila.estado_etapa(con, job.id, "revisao") == "erro"
+    assert fila.tentativas_etapa(con, job.id, "revisao") == 1
+    for _ in range(MAX_TENTATIVAS_ETAPA - 1):
+        estado = produzir(cfg, con, job.id, registro=reg)
+    assert estado == Estado.FALHOU
+    assert fila.obter(con, job.id).erro == "revisao: revisão não decidiu"
+    assert chamadas.count("revisao") == MAX_TENTATIVAS_ETAPA
+
+
 def test_produzir_retoma_em_revisao(cfg, con, job):
     chamadas: list[str] = []
     for n in ETAPAS[:-1]:

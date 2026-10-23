@@ -14,6 +14,7 @@ from autocanal.fila import Estado, Job
 from autocanal.formatos import FORMATOS, Formato
 from autocanal.midia import Midia
 
+PROBLEMAS_REVISAO = "problemas_revisao.json"
 PERFIL_VOZ_PADRAO = (
     "Tom claro, direto e amigável, em português do Brasil. Frases curtas, sem jargão "
     "e sem exageros. Feche com um convite simples, sem insistir em inscrição."
@@ -66,6 +67,18 @@ def carregar_prompt(nome: str, **valores) -> str:
     """Lê `autocanal/prompts/<nome>.md` e preenche os campos com `str.format`."""
     modelo = (files("autocanal") / "prompts" / f"{nome}.md").read_text(encoding="utf-8")
     return modelo.format(**valores)
+
+
+def lista_md(itens: list[str], vazio: str) -> str:
+    """Itens como lista Markdown (`- item`), ou `vazio` se não houver nenhum."""
+    return "\n".join(f"- {i}" for i in itens) if itens else vazio
+
+
+def problemas_revisao(ctx: Contexto) -> list[str]:
+    """Problemas apontados pela última revisão reprovada (vazio se não houve)."""
+    if not (ctx.pasta / PROBLEMAS_REVISAO).exists():
+        return []
+    return [str(p) for p in ler_json(ctx, PROBLEMAS_REVISAO).get("problemas", [])]
 
 
 def titulos_recentes(ctx: Contexto, n: int = 15) -> list[str]:

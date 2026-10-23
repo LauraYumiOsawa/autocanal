@@ -17,6 +17,14 @@ class Formato:
     orientacao: Literal["retrato", "paisagem"]
     etapas: tuple[str, ...]
 
+    @property
+    def resumo(self) -> str:
+        """Ex.: `short (1080×1920, 30 a 60 s)`, para os prompts."""
+        return (
+            f"{self.nome} ({self.largura}×{self.altura}, "
+            f"{self.duracao_min_s} a {self.duracao_max_s} s)"
+        )
+
 
 FORMATOS: dict[str, Formato] = {
     "short": Formato(

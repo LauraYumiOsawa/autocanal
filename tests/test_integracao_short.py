@@ -1,6 +1,5 @@
+import json
 from datetime import UTC, datetime
-
-import pytest
 
 from autocanal import fila
 from autocanal.db import conectar
@@ -31,15 +30,15 @@ def _roteiro(palavras: int = 100, n: int = 4) -> dict:
     }
 
 
-@pytest.mark.xfail(strict=False, reason="depende da Task 10")
 def test_short_offline_gera_mp4_valido(cfg, claude_falso, monkeypatch):
     cfg.claude.bin = claude_falso.claude_bin
-    # metadados e revisão: placeholders que a Task 10 finaliza
     claude_falso.responder(
         _ok(_roteiro()),
-        _ok({"titulo": "Por que o mar é salgado", "descricao": "Resumo do vídeo.",
-             "tags": ["mar", "ciência"]}),
-        _ok({"aprovado": True, "nota": 90, "problemas": []}),
+        _ok({"titulo": "Por que o mar é salgado? 3 motivos", "texto_thumb": "SAL ESCONDIDO",
+             "descricao": "Resumo do vídeo.", "tags": ["mar", "ciência"],
+             "consultas_alvo": ["por que o mar é salgado", "sal do mar", "água do mar"]}),
+        _ok({"aprovado": True, "nota": 90, "problemas": [], "etapa_para_refazer": None,
+             "contains_synthetic_media": False}),
     )
 
     def transcrever_falso(wav, **kw):
@@ -51,8 +50,14 @@ def test_short_offline_gera_mp4_valido(cfg, claude_falso, monkeypatch):
         con, "teste", "short", "por que o mar é salgado", datetime(2026, 11, 2, 15, tzinfo=UTC)
     )
     assert produzir(cfg, con, job.id) == Estado.APROVADO
+    assert len(claude_falso.chamadas()) == 3  # roteiro, metadados e revisor
+    pasta = cfg.dados / "jobs" / job.id
+    meta = json.loads((pasta / "metadados.json").read_text(encoding="utf-8"))
+    assert meta["nota_titulo"] >= cfg.revisao.nota_titulo_minima
+    assert "https://exemplo.org/mar" in meta["descricao_final"]
+    assert meta["descricao_final"].endswith("#shorts") and meta["sintetico"] is False
     midia = Midia(cfg.ffmpeg, cfg.ffprobe)
-    video = cfg.dados / "jobs" / job.id / "video.mp4"
+    video = pasta / "video.mp4"
     info = midia.info(video)
     assert (info.largura, info.altura) == (1080, 1920)
     assert info.tem_audio and 30 <= info.duracao <= 60
