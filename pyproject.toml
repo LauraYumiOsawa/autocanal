@@ -13,6 +13,7 @@ dependencies = [
     "faster-whisper",
     "requests",
     "typer",
+    "av<16",
 ]
 
 [project.scripts]
