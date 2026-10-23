@@ -28,7 +28,7 @@ de fundo (a biblioteca ainda está vazia).
 4. Canal com `feito_para_criancas: true` sobe com `selfDeclaredMadeForKids=true` (upload e veto).
 5. O FLUX nunca passa de 8 GB de VRAM e não roda quando a RAM livre não comporta (protege o desktop).
 
-## 2. Passo 0 — teste de viabilidade do FLUX (antes das tarefas)
+## 2. Passo 0 — teste de viabilidade do FLUX (antes das tarefas que dependem do FLUX)
 
 **Pergunta:** o FLUX.2 [klein] 4B roda na RTX PRO 1000 (8 GB) com a RAM livre típica do notebook,
 gerando em 16:9 e 9:16?
@@ -95,9 +95,9 @@ FORMATOS["medio"] = Formato("medio", 1920, 1080, 60, 300, 150, 750, "paisagem",
 - `PixabayImagens` é dividido em `pixabay_video` e `pixabay_foto` (a origem continua `"pixabay"`).
 - Novo provedor `flux`, que trabalha em lote.
 - `procedural` é sempre o último; ele é acrescentado se o canal o omitir.
-- Ordem por canal em `canais.yaml`: `visuais: [pixabay_video, flux, pixabay_foto, procedural]`. O padrão,
+- Ordem por canal em `canais.yaml`, por exemplo `visuais: [flux, pixabay_video, pixabay_foto, procedural]`. O padrão,
   quando o campo é omitido, é `[pixabay_video, pixabay_foto, procedural]`: nada muda para canais que não
-  pedirem o FLUX. O canal `conteudo` passa a usar a ordem com `flux`.
+  pedirem o FLUX. O canal `conteudo` passa a usar a ordem com `flux` primeiro (ver seção 13).
 
 ### Algoritmo
 Os provedores são percorridos na ordem; cada um recebe **todos** os trechos ainda sem mídia. Provedores
@@ -188,8 +188,30 @@ recebe todos de uma vez. `ErroProvedor` → aviso no log e os trechos seguem par
 - Prova final, sem upload: `autocanal novo conteudo medio "<tema>"` → `produzir` → conferir vídeo,
   thumbnail e descrição.
 
-## 13. Checklist de Laura
+## 13. O que a prova real do Short mostrou (2026-10-23)
+
+O job `20261024-conteudo-short-2ea9` foi para quarentena depois de 2 rodadas. A revisão funcionou e
+apontou três classes de problema que este plano trata:
+
+- **Legendas estouram o quadro:** grupos de 3 palavras longas em 88 px ("VELOCIDADE NUM COMPUTADOR")
+  passam da largura com `WrapStyle: 2`. Correção (vale para todos os formatos): `agrupar` fecha o grupo
+  também quando a largura medida do texto em caixa alta (Pillow, fonte do canal no tamanho da legenda)
+  passar da largura útil = `largura − MarginL − MarginR − 2 × Outline`. Uma palavra sozinha mais larga
+  que isso fica sozinha no grupo.
+- **Pixabay erra o assunto:** consultas de 2–5 palavras trouxeram Castelo de Osaka, tomates no forno,
+  logotipo do Cartoon Network e aparelhos de marca. Isso reforça o FLUX: no canal `conteudo` a ordem
+  passa a ser `[flux, pixabay_video, pixabay_foto, procedural]` (o padrão dos outros canais não muda).
+- **Afirmações além da fonte:** o revisor pegou frases que extrapolam a fonte citada; o mecanismo já
+  existe (refazer roteiro), sem mudança neste plano.
+
+Também: a chave do Google TTS tem restrição de API que não inclui o Cloud Text-to-Speech
+(`API_KEY_SERVICE_BLOCKED`); a narração caiu no Kokoro, como previsto. Ação de Laura no checklist.
+
+## 14. Checklist de Laura
 
 1. youtube.com/verify (miniatura personalizada).
 2. País do canal = Brasil no YouTube Studio.
 3. Olhar as 4 amostras do Passo 0 e dizer se a qualidade serve.
+4. Google Cloud → APIs e serviços → Credenciais → a chave de API → Restrições de API: incluir
+   **Cloud Text-to-Speech API** (e conferir que a API está ativada e o faturamento ligado).
+5. Baixar os pesos do FLUX fora da rede da empresa (o firewall intercepta o huggingface.co).
