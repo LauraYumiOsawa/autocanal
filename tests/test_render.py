@@ -8,7 +8,12 @@ from autocanal import fila
 from autocanal.db import conectar
 from autocanal.etapas import render
 from autocanal.etapas.base import contexto_para, gravar_json
-from autocanal.etapas.render import comando_final, comando_segmento
+from autocanal.etapas.render import (
+    comando_audio,
+    comando_mux,
+    comando_segmento,
+    comando_video_legendado,
+)
 
 
 def test_comando_segmento_imagem():
@@ -23,16 +28,26 @@ def test_comando_segmento_video():
     assert "-stream_loop" in cmd and "setsar=1" in " ".join(cmd) and "zoompan" not in " ".join(cmd)
 
 
-def test_comando_final_sem_trilha():
-    texto = " ".join(comando_final(Path("b.mp4"), Path("n.wav"), "legendas.ass", None, Path("v.mp4")))
-    assert "ass=legendas.ass" in texto and "loudnorm=I=-14" in texto and "amix" not in texto
+def test_comando_video_legendado():
+    cmd = comando_video_legendado(Path("b.mp4"), "legendas.ass", Path("v.mp4"))
+    assert "ass=legendas.ass" in cmd and "-an" in cmd and cmd[-1] == "v.mp4"
 
 
-def test_comando_final_com_trilha():
-    texto = " ".join(
-        comando_final(Path("b.mp4"), Path("n.wav"), "legendas.ass", Path("m.mp3"), Path("v.mp4"))
-    )
-    assert "volume=-20dB" in texto and "amix=" in texto and "-shortest" in texto
+def test_comando_audio_sem_trilha():
+    texto = " ".join(comando_audio(Path("n.wav"), None, Path("a.m4a")))
+    assert "aresample=48000,acompressor" in texto and "loudnorm=I=-14" in texto and "amix" not in texto
+
+
+def test_comando_audio_com_trilha():
+    cmd = comando_audio(Path("n.wav"), Path("m.mp3"), Path("a.m4a"))
+    texto = " ".join(cmd)
+    assert "volume=-20dB" in texto and "amix=inputs=2:duration=first:normalize=0" in texto
+    assert "-stream_loop" in cmd
+
+
+def test_comando_mux():
+    cmd = comando_mux(Path("v.mp4"), Path("a.m4a"), Path("o.mp4"))
+    assert "-shortest" in cmd and "+faststart" in cmd and cmd[cmd.index("-c") + 1] == "copy"
 
 
 def test_duracoes_ladrilham_a_narracao():

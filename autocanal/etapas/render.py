@@ -8,6 +8,7 @@ from typing import Literal
 
 from autocanal.etapas.base import Contexto, ErroEtapa, ler_json
 
+COMPRESSOR_VOZ = "acompressor=threshold=-30dB:ratio=4:attack=5:release=100:makeup=6dB"
 CODEC_VIDEO = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
 
 
@@ -35,24 +36,34 @@ def comando_segmento(
     return [*origem, "-vf", filtro, "-t", f"{duracao:.3f}", "-an", *CODEC_VIDEO, str(saida)]
 
 
-def comando_final(
-    base: Path, narracao: Path, legendas_nome: str, trilha: Path | None, saida: Path
-) -> list[str]:
-    video = f"[0:v]ass={legendas_nome}[v]"
+def comando_video_legendado(base: Path, legendas_nome: str, saida: Path) -> list[str]:
+    return ["-i", str(base), "-vf", f"ass={legendas_nome}", "-an", *CODEC_VIDEO, str(saida)]
+
+
+def comando_audio(narracao: Path, trilha: Path | None, saida: Path) -> list[str]:
+    # reamostra antes do loudnorm: com a saída em 24 kHz o loudnorm trava neste ffmpeg;
+    # o compressor sobe a fala (pico baixo) sem estourar o limite de true peak
+    voz = f"aresample=48000,{COMPRESSOR_VOZ}"
+    final = "loudnorm=I=-14:TP=-1.5:LRA=11"
     if trilha is None:
-        filtro = f"{video};[1:a]loudnorm=I=-14:TP=-1.5:LRA=11[a]"
-        entradas = ["-i", str(base), "-i", str(narracao)]
+        entradas = ["-i", str(narracao)]
+        filtro = f"[0:a]{voz},{final}[a]"
     else:
+        entradas = ["-i", str(narracao), "-stream_loop", "-1", "-i", str(trilha)]
         filtro = (
-            f"{video};[2:a]volume=-20dB[m];"
-            "[1:a][m]amix=inputs=2:duration=first:normalize=0[mix];"
-            "[mix]loudnorm=I=-14:TP=-1.5:LRA=11[a]"
+            f"[0:a]{voz}[v];[1:a]aresample=48000,volume=-20dB[m];"
+            f"[v][m]amix=inputs=2:duration=first:normalize=0[mix];[mix]{final}[a]"
         )
-        entradas = ["-i", str(base), "-i", str(narracao), "-stream_loop", "-1", "-i", str(trilha)]
     return [
-        *entradas, "-filter_complex", filtro, "-map", "[v]", "-map", "[a]",
-        *CODEC_VIDEO, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
-        "-shortest", "-movflags", "+faststart", str(saida),
+        *entradas, "-filter_complex", filtro, "-map", "[a]",
+        "-c:a", "aac", "-b:a", "192k", str(saida),
+    ]
+
+
+def comando_mux(video: Path, audio: Path, saida: Path) -> list[str]:
+    return [
+        "-i", str(video), "-i", str(audio), "-map", "0:v:0", "-map", "1:a:0",
+        "-c", "copy", "-shortest", "-movflags", "+faststart", str(saida),
     ]
 
 
@@ -101,8 +112,11 @@ def executar(ctx: Contexto) -> None:
         ["-f", "concat", "-safe", "0", "-i", str(lista), "-c", "copy", str(base)],
         cwd=ctx.pasta,
     )
-    cmd = comando_final(
-        base, ctx.pasta / "narracao.wav", "legendas.ass", _escolher_trilha(ctx),
-        ctx.pasta / "video.mp4",
+    video = pasta / "video_legendado.mp4"
+    audio = pasta / "audio.m4a"
+    ctx.midia.rodar(comando_video_legendado(base, "legendas.ass", video), cwd=ctx.pasta, timeout_s=600)
+    ctx.midia.rodar(
+        comando_audio(ctx.pasta / "narracao.wav", _escolher_trilha(ctx), audio),
+        cwd=ctx.pasta, timeout_s=600,
     )
-    ctx.midia.rodar(cmd, cwd=ctx.pasta)
+    ctx.midia.rodar(comando_mux(video, audio, ctx.pasta / "video.mp4"), cwd=ctx.pasta, timeout_s=600)
