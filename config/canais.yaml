@@ -1,6 +1,6 @@
 conteudo:
-  nome: Conteúdo
-  nicho: ""
+  nome: Curiosidades
+  nicho: "Curiosidades sobre Tecnologia/Tutoriais/Empreendedorismo"
   idioma: pt-BR
   categoria_id: "27"
   paleta: {fundo: "#0F172A", texto: "#F8FAFC", destaque: "#FACC15"}
@@ -13,7 +13,7 @@ conteudo:
     - {formato: short, dias: [ter, qui, sab], hora: "19:00"}
 musica:
   nome: Música
-  nicho: ""
+  nicho: "Video Clipes e meme"
   idioma: pt-BR
   categoria_id: "10"
   paleta: {fundo: "#0F172A", texto: "#F8FAFC", destaque: "#FACC15"}
@@ -23,7 +23,7 @@ musica:
   perfil_voz: config/vozes/exemplo.md
   grade: []  # preenchida no Plano 3
 teste:
-  nome: Teste
+  nome: Dr.Curioso
   nicho: "curiosidades de ciência"
   idioma: pt-BR
   categoria_id: "27"
@@ -33,3 +33,17 @@ teste:
   fonte_nome: DejaVu Sans
   perfil_voz: config/vozes/teste.md
   grade: []  # canal só para provas locais: o tick nunca planeja nada aqui
+infantil:
+  nome: Infantil
+  nicho: "Conteúdo infantil e videoclipes: cantigas de roda e músicas infantis (domínio público ou letras originais) em videoclipes animados, coloridos e repetitivos, para crianças de 2 a 6 anos"
+  idioma: pt-BR
+  categoria_id: "10"
+  paleta: {fundo: "#1D4ED8", texto: "#FFFFFF", destaque: "#FDE047"}
+  tts: {provedor: google, voz: pt-BR-Chirp3-HD-Leda, reserva: kokoro, voz_reserva: pf_dora}
+  fonte_arquivo: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+  fonte_nome: DejaVu Sans
+  perfil_voz: config/vozes/infantil.md
+  grade: []  # desligada até o upload marcar madeForKids=true e o formato medio existir
+  # grade prevista (shorts diários + médios de até 5 min):
+  #   - {formato: short, dias: [seg, ter, qua, qui, sex, sab, dom], hora: "10:00"}
+  #   - {formato: medio, dias: [qua, sab], hora: "09:00"}
