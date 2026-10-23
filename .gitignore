@@ -1,0 +1,9 @@
+dados/
+config/client_secret.json
+config/segredos.env
+.venv/
+__pycache__/
+*.pyc
+vendor/
+servicos/*/modelos/
+.pytest_cache/
