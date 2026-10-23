@@ -23,6 +23,14 @@ def test_segredos_opcionais(raiz_teste):
     assert carregar(raiz_teste).chaves["PEXELS_API_KEY"] == "abc"
 
 
+def test_segredos_sem_aspas(raiz_teste):
+    (raiz_teste / "config" / "segredos.env").write_text(
+        "A=\"abc\"\nB='def'\nC=\"g\nD=\"\n"
+    )
+    chaves = carregar(raiz_teste).chaves
+    assert chaves == {"A": "abc", "B": "def", "C": "\"g", "D": "\""}
+
+
 def test_slot_hora_invalida():
     with pytest.raises(ValidationError):
         Slot(formato="short", dias=["seg"], hora="25:00")

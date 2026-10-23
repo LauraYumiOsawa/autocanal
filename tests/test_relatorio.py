@@ -130,6 +130,19 @@ def test_alerta_canal_sem_autorizacao_com_aprovados(cfg, con):
     assert len(alertas) == 1 and "autocanal auth teste" in alertas[0]
 
 
+def test_alerta_visuais_so_procedurais(cfg, con):
+    so_proc = _job(cfg, con, Estado.QUARENTENA, datetime(2026, 10, 27, 15, tzinfo=UTC))
+    misto = _job(cfg, con, Estado.QUARENTENA, datetime(2026, 10, 28, 15, tzinfo=UTC))
+    casos = ((so_proc, ["procedural", "procedural"]), (misto, ["pexels", "procedural"]))
+    for job, origens in casos:
+        pasta = cfg.dados / "jobs" / job.id
+        pasta.mkdir(parents=True, exist_ok=True)
+        (pasta / "fontes_midia.json").write_text(json.dumps([{"origem": o} for o in origens]))
+    alertas = relatorio.alertas(cfg, con, datetime.now(UTC))
+    assert len(alertas) == 1
+    assert so_proc.id in alertas[0] and "PEXELS_API_KEY" in alertas[0]
+
+
 def test_alerta_pausa_por_queda_geral(cfg, con):
     agora = datetime.now(UTC)
     produtor.pausar_sistema(cfg, "não consegui subir o serviço kokoro: OSError", agora)

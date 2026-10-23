@@ -153,9 +153,13 @@ class Vazio:
         return None
 
 
-def test_cadeia_cai_para_procedural(tmp_path):
+def test_cadeia_cai_para_procedural(tmp_path, caplog):
+    caplog.set_level("WARNING", logger="autocanal.provedores.imagens")
     m = buscar_em_cadeia([Quebrado(), Vazio(), _fundo()], "gato", "retrato", tmp_path / "s", set())
     assert isinstance(m, MidiaObtida) and m.origem == "procedural"
+    [aviso] = caplog.records
+    assert aviso.levelname == "WARNING" and "q" in aviso.getMessage()
+    assert "falhou" in aviso.getMessage()
 
 
 def test_criar_cadeia_sem_chaves(cfg):

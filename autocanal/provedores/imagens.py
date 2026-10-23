@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import colorsys
 import hashlib
+import logging
 import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -13,6 +14,8 @@ from PIL import Image, ImageDraw
 
 from autocanal.config import Canal, Config, Paleta
 from autocanal.provedores import ErroProvedor
+
+log = logging.getLogger(__name__)
 
 Orientacao = Literal["retrato", "paisagem"]
 
@@ -276,7 +279,8 @@ def buscar_em_cadeia(
     for p in cadeia:
         try:
             m = p.buscar(consulta, orientacao, destino_sem_ext, excluir)
-        except ErroProvedor:
+        except ErroProvedor as e:
+            log.warning("provedor de imagens %s falhou para %r: %s", p.nome, consulta, e)
             continue
         if m is not None:
             return m

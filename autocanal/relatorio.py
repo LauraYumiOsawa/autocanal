@@ -73,6 +73,10 @@ def _quarentena(cfg: Config, con: sqlite3.Connection) -> list[str]:
     return linhas
 
 
+_COM_VISUAIS = (Estado.PRODUZINDO, Estado.EM_REVISAO, Estado.QUARENTENA, Estado.APROVADO,
+                Estado.AGENDADO)
+
+
 def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
     """Canais sem autorização, cota do YouTube esgotada, pausa do Claude e recuo do planejador."""
     avisos: list[str] = []
@@ -94,6 +98,17 @@ def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
     if pausa is not None and agora < pausa:
         avisos.append(f"Claude pausado por limite de uso do plano até {_hora(cfg, pausa)}:"
                       " a produção retoma depois.")
+    for job in fila.listar(con, set(_COM_VISUAIS)):
+        try:
+            fontes = json.loads(
+                (cfg.dados / "jobs" / job.id / "fontes_midia.json").read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            continue
+        if fontes and all(f.get("origem") == "procedural" for f in fontes):
+            avisos.append(f"Job `{job.id}` só com visuais procedurais (nenhum banco de imagens"
+                          " respondeu): confira PEXELS_API_KEY e PIXABAY_API_KEY em"
+                          " config/segredos.env e o log.")
     sistema = produtor.pausa_sistema(cfg)
     if sistema is not None and agora < sistema[0]:
         avisos.append(f"Produção pausada até {_hora(cfg, sistema[0])} por queda geral"

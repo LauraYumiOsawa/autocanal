@@ -116,7 +116,10 @@ def _ler_segredos(arquivo: Path) -> dict[str, str]:
         if not linha or linha.startswith("#") or "=" not in linha:
             continue
         nome, _, valor = linha.partition("=")
-        chaves[nome.strip()] = valor.strip()
+        valor = valor.strip()
+        if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in "\"'":
+            valor = valor[1:-1]  # CHAVE="valor" ou CHAVE='valor'
+        chaves[nome.strip()] = valor
     return chaves
 
 
