@@ -229,6 +229,7 @@ def test_narracao_reserva_nao_mistura_vozes(ctx, monkeypatch):
 
 def test_legendas_usa_transcricao(ctx, cfg, monkeypatch):
     TTSFalso().sintetizar("um dois três", ctx.pasta / "narracao.wav")
+    _segmentos(ctx, ["Olá, mundo.", "Tudo bem?"])
     palavras = [Palavra("Olá", 0.0, 0.3), Palavra("mundo.", 0.35, 0.7),
                 Palavra("tudo", 0.9, 1.1), Palavra("bem", 1.15, 1.4)]
     recebido = {}
@@ -251,11 +252,19 @@ def test_legendas_usa_transcricao(ctx, cfg, monkeypatch):
     assert "PlayResX: 1080" in ass and "PlayResY: 1920" in ass
     assert "Style: Legenda,DejaVu Sans,88,&H00FCFAF8,&H0015CCFA," in ass
     assert ass.split("Style: Legenda", 1)[1].splitlines()[0].endswith(",560,1")
-    assert "OLÁ MUNDO." in ass and "TUDO BEM" in ass
+    assert "OLÁ, MUNDO." in ass and "TUDO BEM?" in ass  # texto do roteiro, não do Whisper
+
+
+def test_legendas_sem_roteiro_falha(ctx, monkeypatch):
+    TTSFalso().sintetizar("um", ctx.pasta / "narracao.wav")
+    monkeypatch.setattr(legendas, "transcrever", lambda wav, **kw: [Palavra("um", 0.0, 0.3)])
+    with pytest.raises(ErroEtapa, match="roteiro.json"):
+        legendas.executar(ctx)
 
 
 def test_legendas_sem_palavras_falha(ctx, monkeypatch):
     TTSFalso().sintetizar("um", ctx.pasta / "narracao.wav")
+    _segmentos(ctx, ["um"])
     monkeypatch.setattr(legendas, "transcrever", lambda wav, **kw: [])
     with pytest.raises(ErroEtapa):
         legendas.executar(ctx)

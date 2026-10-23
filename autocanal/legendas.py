@@ -1,11 +1,14 @@
 """Legendas: transcrição com faster-whisper (palavra a palavra) e arquivo ASS."""
 from __future__ import annotations
 
+import difflib
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
 _MODELOS: dict[tuple[str, str, str], object] = {}
 _FINAIS = (".", "!", "?")
+_SEM_PAR_S = 0.25  # duração de palavra do roteiro sem par no Whisper, nas pontas
 
 
 @dataclass(frozen=True)
@@ -51,6 +54,70 @@ def transcrever(
             if texto:
                 palavras.append(Palavra(texto, float(w.start), float(w.end)))
     return palavras
+
+
+def _normalizar(palavra: str) -> str:
+    """Minúsculas, sem acentos nem pontuação (só para comparar)."""
+    sem_acento = "".join(
+        c for c in unicodedata.normalize("NFKD", palavra) if not unicodedata.combining(c)
+    )
+    return "".join(c for c in sem_acento.lower() if c.isalnum())
+
+
+def _palavras_roteiro(texto: str) -> list[str]:
+    """Palavras do roteiro; sinais soltos (ex.: "—") grudam na palavra vizinha."""
+    palavras: list[str] = []
+    pendente = ""
+    for token in texto.split():
+        if _normalizar(token):
+            palavras.append(pendente + token)
+            pendente = ""
+        elif palavras:
+            palavras[-1] += " " + token
+        else:
+            pendente += token + " "
+    return palavras
+
+
+def alinhar(texto: str, transcritas: list[Palavra]) -> list[Palavra]:
+    """Texto do roteiro com os tempos do Whisper.
+
+    Palavras casadas herdam os tempos do Whisper; trechos trocados dividem o intervalo
+    das palavras do Whisper correspondentes; palavras sem par são interpoladas entre
+    as vizinhas. O texto (caixa, acentos, pontuação) é sempre o do roteiro.
+    """
+    roteiro = _palavras_roteiro(texto)
+    if not roteiro or not transcritas:
+        return []
+    a = [_normalizar(p) for p in roteiro]
+    b = [_normalizar(p.texto) for p in transcritas]
+    saida: list[Palavra] = []
+
+    def distribuir(i1: int, i2: int, inicio: float, fim: float) -> None:
+        fim = max(fim, inicio)
+        passo = (fim - inicio) / (i2 - i1)
+        for k, i in enumerate(range(i1, i2)):
+            saida.append(Palavra(roteiro[i], inicio + k * passo, inicio + (k + 1) * passo))
+
+    fim_total = transcritas[-1].fim
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if op == "equal":
+            for i, j in zip(range(i1, i2), range(j1, j2)):
+                w = transcritas[j]
+                saida.append(Palavra(roteiro[i], w.inicio, w.fim))
+        elif op == "replace":
+            distribuir(i1, i2, transcritas[j1].inicio, transcritas[j2 - 1].fim)
+        elif op == "delete":
+            n = i2 - i1
+            if j1 >= len(transcritas):  # sobra no fim: logo após a última palavra
+                inicio = saida[-1].fim if saida else fim_total
+                distribuir(i1, i2, inicio, inicio + _SEM_PAR_S * n)
+            elif not saida:  # sobra no começo: logo antes da primeira palavra
+                fim = transcritas[0].inicio
+                distribuir(i1, i2, max(0.0, fim - _SEM_PAR_S * n), fim)
+            else:
+                distribuir(i1, i2, saida[-1].fim, transcritas[j1].inicio)
+    return saida
 
 
 def agrupar(

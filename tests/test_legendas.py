@@ -8,6 +8,7 @@ from autocanal.legendas import (
     Legenda,
     Palavra,
     agrupar,
+    alinhar,
     cor_ass,
     escapar_ass,
     gerar_ass,
@@ -25,6 +26,41 @@ def _no_ar(url: str) -> bool:
 
 def _palavras(textos, passo=0.3):
     return [Palavra(t, i * passo, i * passo + 0.25) for i, t in enumerate(textos)]
+
+
+def _monotonas(palavras):
+    for p in palavras:
+        assert p.inicio <= p.fim
+    for a, b in zip(palavras, palavras[1:]):
+        assert a.fim <= b.inicio + 1e-9
+
+
+def test_alinhar_usa_texto_do_roteiro_e_tempos_do_whisper():
+    whisper = _palavras(["porque", "aqui", "na", "terra", "ele", "é", "laranja"])
+    out = alinhar("Por que aqui na Terra ele é laranja?", whisper)
+    assert [p.texto for p in out] == ["Por", "que", "aqui", "na", "Terra", "ele", "é", "laranja?"]
+    _monotonas(out)
+    # "Por que" divide o intervalo de "porque"; as casadas herdam os tempos do Whisper
+    assert (out[0].inicio, out[1].fim) == (whisper[0].inicio, whisper[0].fim)
+    assert (out[4].inicio, out[4].fim) == (whisper[3].inicio, whisper[3].fim)
+    assert (out[-1].inicio, out[-1].fim) == (whisper[-1].inicio, whisper[-1].fim)
+    legendas = agrupar(out)
+    assert " ".join(lg.texto for lg in legendas) == "Por que aqui na Terra ele é laranja?"
+
+
+def test_alinhar_interpola_palavras_sem_par():
+    whisper = [Palavra("o", 0.0, 0.2), Palavra("mar", 0.2, 0.5), Palavra("salgado", 1.5, 2.0)]
+    out = alinhar("Então o mar — muito — salgado. Fim", whisper)
+    assert [p.texto for p in out] == ["Então", "o", "mar —", "muito —", "salgado.", "Fim"]
+    _monotonas(out)
+    assert out[0].fim == 0.0  # antes da primeira palavra, sem tempo negativo
+    assert 0.5 <= out[3].inicio and out[3].fim <= 1.5
+    assert out[-1].inicio == 2.0 and out[-1].fim > 2.0
+
+
+def test_alinhar_vazio():
+    assert alinhar("", _palavras(["a"])) == []
+    assert alinhar("a b", []) == []
 
 
 def test_agrupar_por_tamanho_e_pontuacao():

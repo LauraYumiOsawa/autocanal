@@ -39,7 +39,7 @@ REVISAO = {
         "problemas": {"type": "array", "items": {"type": "string"}},
         "etapa_para_refazer": {
             "type": ["string", "null"],
-            "enum": ["roteiro", "narracao", "visuais", "render", "metadados", None],
+            "enum": ["roteiro", "narracao", "legendas", "visuais", "render", "metadados", None],
         },
         "contains_synthetic_media": {"type": "boolean"},
     },

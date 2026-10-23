@@ -34,5 +34,5 @@ Formato: {formato}
 - `aprovado`: true só se nenhum dos itens 1 a 4 tiver problema.
 - `nota`: de 0 a 100, a qualidade geral do vídeo.
 - `problemas`: lista de problemas concretos e acionáveis, cada um dizendo o quê e onde (vazia se aprovado).
-- `etapa_para_refazer`: a etapa mais cedo que resolve todos os problemas: `roteiro` (texto, fatos, fontes, variação), `narracao` (a voz pulou ou trocou trechos), `visuais` (imagens impróprias ou que não combinam com a fala), `render` (montagem, legendas queimadas, áudio) ou `metadados` (título, thumbnail, descrição, tags, capítulos); `null` se aprovado.
+- `etapa_para_refazer`: a etapa mais cedo que resolve todos os problemas: `roteiro` (texto, fatos, fontes, variação), `narracao` (a voz pulou ou trocou trechos), `legendas` (texto ou tempo das legendas queimadas errado), `visuais` (imagens impróprias ou que não combinam com a fala), `render` (montagem, áudio) ou `metadados` (título, thumbnail, descrição, tags, capítulos); `null` se aprovado.
 - `contains_synthetic_media`: a decisão do item 5.

@@ -320,3 +320,10 @@ def test_reprovacao_refaz_so_as_etapas_resetadas(ctx, cfg, con, claude_falso):
 
 def test_registro_tem_revisao():
     assert etapas.REGISTRO["revisao"] is revisao.executar
+
+
+def test_revisor_pode_pedir_refazer_legendas():
+    enum = revisao.REVISAO["properties"]["etapa_para_refazer"]["enum"]
+    assert "legendas" in enum
+    prompt = Path(revisao.__file__).parent.parent / "prompts" / "revisao.md"
+    assert "`legendas`" in prompt.read_text(encoding="utf-8")

@@ -1,8 +1,10 @@
-"""Etapa legendas: transcreve a narração real (faster-whisper) e gera o `.ass`."""
+"""Etapa legendas: tempos da narração real (faster-whisper) + texto do roteiro → `.ass`."""
 from __future__ import annotations
 
+import json
+
 from autocanal.etapas.base import Contexto, ErroEtapa, gravar_json
-from autocanal.legendas import agrupar, gerar_ass, transcrever
+from autocanal.legendas import agrupar, alinhar, gerar_ass, transcrever
 
 TAMANHO = 88
 MARGEM_V = 560
@@ -12,6 +14,11 @@ def executar(ctx: Contexto) -> None:
     wav = ctx.pasta / "narracao.wav"
     if not wav.exists():
         raise ErroEtapa("artefato ausente: narracao.wav")
+    arq_roteiro = ctx.pasta / "roteiro.json"
+    if not arq_roteiro.exists():
+        raise ErroEtapa("artefato ausente: roteiro.json")
+    segmentos = json.loads(arq_roteiro.read_text(encoding="utf-8"))["segmentos"]
+    texto = " ".join(s["texto"] for s in segmentos)
     w = ctx.cfg.whisper
     palavras = transcrever(
         wav,
@@ -30,9 +37,12 @@ def executar(ctx: Contexto) -> None:
             "palavras": [{"texto": p.texto, "inicio": p.inicio, "fim": p.fim} for p in palavras],
         },
     )
+    alinhadas = alinhar(texto, palavras)
+    if not alinhadas:
+        raise ErroEtapa("roteiro sem palavras para legendar")
     fmt, canal = ctx.formato, ctx.canal
     gerar_ass(
-        agrupar(palavras),
+        agrupar(alinhadas),
         ctx.pasta / "legendas.ass",
         largura=fmt.largura,
         altura=fmt.altura,
