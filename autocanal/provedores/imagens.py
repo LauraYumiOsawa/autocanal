@@ -1,4 +1,4 @@
-"""Provedores de imagens e b-roll: Pexels, Pixabay e fundo procedural."""
+"""Provedores de imagens e b-roll: Pixabay e fundo procedural."""
 from __future__ import annotations
 
 import colorsys
@@ -19,8 +19,6 @@ log = logging.getLogger(__name__)
 
 Orientacao = Literal["retrato", "paisagem"]
 
-PEXELS_VIDEOS = "https://api.pexels.com/videos/search"
-PEXELS_FOTOS = "https://api.pexels.com/v1/search"
 PIXABAY_VIDEOS = "https://pixabay.com/api/videos/"
 PIXABAY_FOTOS = "https://pixabay.com/api/"
 
@@ -81,68 +79,6 @@ def _salvar(sessao, nome: str, link: str, destino_sem_ext: Path, ext: str) -> Pa
     return destino
 
 
-class PexelsImagens:
-    nome = "pexels"
-    licenca = "Pexels License"
-
-    def __init__(self, api_key: str, sessao=requests):
-        self._api_key = api_key
-        self.sessao = sessao
-
-    def __repr__(self) -> str:
-        return "PexelsImagens()"
-
-    def _buscar(self, url: str, consulta: str, orientacao: Orientacao) -> dict:
-        r = _get(
-            self.sessao,
-            "Pexels",
-            url,
-            params={
-                "query": consulta,
-                "orientation": "portrait" if orientacao == "retrato" else "landscape",
-                "per_page": 8,
-            },
-            headers={"Authorization": self._api_key},
-        )
-        return _json(r, "Pexels")
-
-    @staticmethod
-    def _melhor_arquivo(arquivos: list[dict], orientacao: Orientacao) -> dict | None:
-        alvo = 1920 if orientacao == "retrato" else 1080
-        ok = [
-            a for a in arquivos
-            if a.get("link")
-            and (a.get("height") or 0) >= 1080
-            and str(a.get("file_type", "video/mp4")) == "video/mp4"
-        ]
-        return min(ok, key=lambda a: abs(a["height"] - alvo)) if ok else None
-
-    def buscar(self, consulta, orientacao, destino_sem_ext, excluir):
-        for v in self._buscar(PEXELS_VIDEOS, consulta, orientacao).get("videos", []):
-            pagina = v.get("url", "")
-            if pagina in excluir:
-                continue
-            arq = self._melhor_arquivo(v.get("video_files", []), orientacao)
-            if arq is None:
-                continue
-            caminho = _salvar(self.sessao, "Pexels", arq["link"], destino_sem_ext, ".mp4")
-            return MidiaObtida(
-                caminho, "video", self.nome, pagina, self.licenca,
-                (v.get("user") or {}).get("name", ""),
-            )
-        for f in self._buscar(PEXELS_FOTOS, consulta, orientacao).get("photos", []):
-            pagina = f.get("url", "")
-            link = (f.get("src") or {}).get("large2x")
-            if pagina in excluir or not link:
-                continue
-            caminho = _salvar(self.sessao, "Pexels", link, destino_sem_ext, ".jpg")
-            return MidiaObtida(
-                caminho, "imagem", self.nome, pagina, self.licenca,
-                f.get("photographer", ""),
-            )
-        return None
-
-
 class PixabayImagens:
     nome = "pixabay"
     licenca = "Pixabay Content License"
@@ -164,10 +100,18 @@ class PixabayImagens:
                 "q": consulta,
                 "orientation": "vertical" if orientacao == "retrato" else "horizontal",
                 "safesearch": "true",
-                "per_page": 8,
+                "per_page": 20,
             },
         )
         return _json(r, "Pixabay").get("hits", [])
+
+    @staticmethod
+    def _serve(arq: dict, orientacao: Orientacao) -> bool:
+        # a API de vídeos ignora `orientation`: um vídeo deitado num Short vira um recorte
+        # ampliado de 1/3 da largura, então a orientação é conferida aqui
+        larg, alt = arq.get("width") or 0, arq.get("height") or 0
+        deitado = larg >= alt
+        return bool(arq.get("url")) and alt >= 1080 and deitado == (orientacao == "paisagem")
 
     def buscar(self, consulta, orientacao, destino_sem_ext, excluir):
         for h in self._buscar(PIXABAY_VIDEOS, consulta, orientacao):
@@ -176,7 +120,7 @@ class PixabayImagens:
                 continue
             for tam in ("large", "medium"):
                 arq = (h.get("videos") or {}).get(tam) or {}
-                if arq.get("url") and (arq.get("height") or 0) >= 1080:
+                if self._serve(arq, orientacao):
                     caminho = _salvar(
                         self.sessao, "Pixabay", arq["url"], destino_sem_ext, ".mp4"
                     )
@@ -261,8 +205,6 @@ def criar_cadeia(
     cfg: Config, canal: Canal, largura: int, altura: int
 ) -> list[ProvedorImagens]:
     cadeia: list[ProvedorImagens] = []
-    if cfg.chaves.get("PEXELS_API_KEY"):
-        cadeia.append(PexelsImagens(cfg.chaves["PEXELS_API_KEY"]))
     if cfg.chaves.get("PIXABAY_API_KEY"):
         cadeia.append(PixabayImagens(cfg.chaves["PIXABAY_API_KEY"]))
     cadeia.append(FundoProcedural(canal.paleta, canal.fonte_arquivo, largura, altura))

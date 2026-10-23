@@ -116,7 +116,7 @@ def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
             continue
         if fontes and all(f.get("origem") == "procedural" for f in fontes):
             avisos.append(f"Job `{job.id}` só com visuais procedurais (nenhum banco de imagens"
-                          " respondeu): confira PEXELS_API_KEY e PIXABAY_API_KEY em"
+                          " respondeu): confira PIXABAY_API_KEY em"
                           " config/segredos.env e o log.")
     sistema = produtor.pausa_sistema(cfg)
     if sistema is not None and agora < sistema[0]:

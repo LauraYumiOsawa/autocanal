@@ -55,7 +55,7 @@ ações de Laura, listadas no checklist (seção 14). Vídeos com o rosto de Lau
 | Client do arquivo é tipo `web`, sem `redirect_uris` | Checklist: cadastrar `http://localhost:8080/` | arquivo local |
 | ACE-Step 1.5: MIT, uso comercial das músicas declarado, < 4 GB VRAM | Gerador de música local | model card HF |
 | Google Cloud TTS: 1M caracteres/mês grátis (Chirp 3 HD), 4M (Standard/WaveNet); exige conta de faturamento | Provedor TTS principal, com Kokoro (Apache 2.0) de reserva local | página de preços |
-| Pexels/Pixabay: API grátis, uso comercial sem atribuição | Provedores de imagens/b-roll | licenças |
+| Pixabay: API grátis, uso comercial sem atribuição (Pexels removido em 2026-10-23: pausou chaves novas) | Provedor de imagens/b-roll | licenças |
 | Política "conteúdo inautêntico" do Programa de Parcerias | Variação obrigatória + checagem de repetição na revisão | política YPP |
 
 Cada licença e limite é reconferido antes da adoção e registrado em `LICENCAS.md` com link e data.
@@ -70,7 +70,7 @@ autocanal/
 ├─ config/
 │  ├─ canais.yaml          # canais: nicho, formatos, grade, voz, paleta, idioma, categoria
 │  ├─ autocanal.yaml       # global: caminhos, provedores, modelos do Claude, limites
-│  ├─ segredos.env         # chaves (Pexels, Pixabay, Google TTS) — fora do git
+│  ├─ segredos.env         # chaves (Pixabay, Google TTS) — fora do git
 │  └─ client_secret.json   # OAuth client — fora do git
 ├─ dados/                  # fora do git
 │  ├─ autocanal.db         # SQLite
@@ -147,7 +147,7 @@ Todas as receitas terminam em `metadados → revisao → upload`.
 - **narração** — provedor TTS do canal (`google` → reserva `kokoro`). Um WAV por segmento + um WAV total.
 - **legendas** — faster-whisper com timestamps por palavra sobre a narração real; agrupa em 2–4 palavras;
   gera `.ass` com estilo do canal. A transcrição também alimenta a revisão.
-- **visuais** — para cada segmento, busca b-roll/foto pela descrição visual (Pexels → Pixabay) e
+- **visuais** — para cada segmento, busca b-roll/foto pela descrição visual (Pixabay) e
   registra origem + licença em `fontes_midia.json`. Reserva sem chave/rede: fundo procedural
   (gradiente + tipografia da paleta do canal). Gerador local (FLUX.2 klein 4B) e Gemini ficam como
   provedores futuros.
@@ -321,7 +321,7 @@ Kokoro-FastAPI (CPU). ACE-Step 1.5 em ambiente isolado próprio, exposto como HT
    consentimento em **In production**; adicionar `http://localhost:8080/` em URIs de redirecionamento
    autorizados do client; criar chave de API (TTS e pesquisa).
 4. Conta de faturamento no projeto (exigida pelo TTS, mesmo na camada grátis) — ou optar só pelo Kokoro.
-5. Contas Pexels e Pixabay → chaves de API em `config/segredos.env`.
+5. Conta Pixabay → chave de API em `config/segredos.env`.
 6. Rodar `autocanal auth conteudo` e `autocanal auth musica` (login único por canal).
 7. Enviar o formulário de auditoria da YouTube API (necessário para vídeos públicos).
 8. Confirmar e rodar `autocanal instalar-timer`.

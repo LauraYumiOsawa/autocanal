@@ -435,3 +435,10 @@ def test_produzir_quarentena_respeita_refazer_metadados(cfg, con, rodar, produca
     assert r.exit_code == 0, r.output
     assert [fila.estado_etapa(con, j.id, n) for n in ETAPAS] == [
         "ok", "ok", "ok", "ok", None, None, None]
+
+
+def test_diagnostico_lista_chaves_sem_pexels(rodar, monkeypatch):
+    monkeypatch.setattr(cli, "_executa", lambda cmd: (True, "ok"))
+    r = rodar("diagnostico")
+    assert "PIXABAY_API_KEY" in r.output and "GOOGLE_TTS_API_KEY" in r.output
+    assert "PEXELS" not in r.output

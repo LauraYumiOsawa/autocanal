@@ -1,4 +1,4 @@
-"""Etapa visuais: uma mídia por segmento (Pexels → Pixabay → procedural)."""
+"""Etapa visuais: uma mídia por segmento (Pixabay → procedural)."""
 from __future__ import annotations
 
 import json

@@ -34,7 +34,7 @@ Tema: {tema}
 - `nota_gancho`: o `verdict` do hookscore para esse gancho.
 - `segmentos`: de 3 a 12 trechos, na ordem em que serão falados. O primeiro começa com o gancho.
   - `texto`: exatamente o que a voz vai falar, em pt-BR, escrito como se fala. Sem marcações, sem indicações de cena, sem emojis, sem hashtags.
-  - `visual`: consulta curta **em inglês** (2 a 5 palavras) para buscar vídeo ou foto num banco de imagens (Pexels/Pixabay). Algo concreto e filmável, sem nomes de marcas nem de pessoas.
+  - `visual`: consulta curta **em inglês** (2 a 5 palavras) para buscar vídeo ou foto num banco de imagens (Pixabay). Algo concreto e filmável, sem nomes de marcas nem de pessoas.
 - `fontes`: uma entrada por afirmação factual, com `afirmacao` e `url`.
 - `resumo`: uma ou duas frases dizendo do que o vídeo trata.
 

@@ -9,7 +9,6 @@ from autocanal.provedores import ErroProvedor
 from autocanal.provedores.imagens import (
     FundoProcedural,
     MidiaObtida,
-    PexelsImagens,
     PixabayImagens,
     buscar_em_cadeia,
     criar_cadeia,
@@ -68,46 +67,6 @@ def test_como_dict(tmp_path):
     assert d["caminho"] == str(m.caminho) and isinstance(d["caminho"], str)
 
 
-def _video(id_, pagina, arquivos):
-    return {"id": id_, "url": pagina, "user": {"name": "Ana"}, "video_files": arquivos}
-
-
-def test_pexels_prefere_video_retrato(tmp_path):
-    arquivos = [
-        {"link": "https://v/720.mp4", "width": 720, "height": 1280, "file_type": "video/mp4"},
-        {"link": "https://v/2160.mp4", "width": 2160, "height": 3840, "file_type": "video/mp4"},
-        {"link": "https://v/1080.mp4", "width": 1080, "height": 1920, "file_type": "video/mp4"},
-    ]
-    s = SessaoFalsa({
-        "https://api.pexels.com/videos/search": Resp(
-            json_={"videos": [_video(1, "https://pexels.com/v/1", arquivos)]}),
-        "https://v/1080.mp4": Resp(content=b"VIDEO1080"),
-    })
-    m = PexelsImagens("SEGREDO", sessao=s).buscar("mar", "retrato", tmp_path / "seg", set())
-    assert m.tipo == "video" and m.licenca == "Pexels License"
-    assert m.autor == "Ana" and m.url == "https://pexels.com/v/1"
-    assert m.caminho.read_bytes() == b"VIDEO1080"
-    url, params, headers = s.chamadas[0]
-    assert params["orientation"] == "portrait" and params["per_page"] == 8
-    assert headers["Authorization"] == "SEGREDO"
-
-
-def test_pexels_respeita_excluir(tmp_path):
-    arquivos = [{"link": "https://v/1.mp4", "width": 1080, "height": 1920, "file_type": "video/mp4"}]
-    foto = {"id": 9, "url": "https://pexels.com/p/9", "photographer": "Bia",
-            "src": {"large2x": "https://p/9.jpg"}}
-    s = SessaoFalsa({
-        "https://api.pexels.com/videos/search": Resp(
-            json_={"videos": [_video(1, "https://pexels.com/v/1", arquivos)]}),
-        "https://api.pexels.com/v1/search": Resp(json_={"photos": [foto]}),
-        "https://p/9.jpg": Resp(content=b"JPG"),
-    })
-    m = PexelsImagens("k", sessao=s).buscar(
-        "mar", "retrato", tmp_path / "seg", {"https://pexels.com/v/1"})
-    assert m.tipo == "imagem" and m.autor == "Bia" and m.url == "https://pexels.com/p/9"
-    assert all(not c[0].startswith("https://v/") for c in s.chamadas)
-
-
 def test_pixabay_video_e_chave_fora_do_erro(tmp_path):
     hit = {"pageURL": "https://pixabay.com/v/1", "user": "Caio", "videos": {
         "large": {"url": "https://pb/l.mp4", "width": 1080, "height": 1920},
@@ -139,6 +98,27 @@ def test_pixabay_imagem(tmp_path):
     assert s.chamadas[0][1]["safesearch"] == "true"
 
 
+def test_pixabay_video_so_na_orientacao_pedida(tmp_path):
+    # a API de vídeos do Pixabay ignora `orientation`: o filtro é nosso
+    hit = {"pageURL": "https://pixabay.com/v/2", "user": "Edu", "videos": {
+        "large": {"url": "https://pb/h.mp4", "width": 1920, "height": 1080},
+        "medium": {"url": "https://pb/hm.mp4", "width": 1280, "height": 720}}}
+    foto = {"pageURL": "https://pixabay.com/p/2", "user": "Fe", "largeImageURL": "https://pb/v.jpg"}
+    respostas = {
+        "https://pixabay.com/api/videos/": Resp(json_={"hits": [hit]}),
+        "https://pixabay.com/api/": Resp(json_={"hits": [foto]}),
+        "https://pb/": Resp(content=b"X"),
+    }
+    s = SessaoFalsa(respostas)
+    m = PixabayImagens("k", sessao=s).buscar("mar", "retrato", tmp_path / "r", set())
+    assert m.tipo == "imagem" and m.url == "https://pixabay.com/p/2"
+    assert s.chamadas[0][1]["per_page"] == 20  # mais candidatos: vídeo vertical é raro
+
+    m = PixabayImagens("k", sessao=SessaoFalsa(respostas)).buscar(
+        "mar", "paisagem", tmp_path / "p", set())
+    assert m.tipo == "video" and m.url == "https://pixabay.com/v/2"
+
+
 class Quebrado:
     nome = "q"
 
@@ -167,8 +147,8 @@ def test_criar_cadeia_sem_chaves(cfg):
     assert [type(p) for p in cadeia] == [FundoProcedural]
 
 
-def test_criar_cadeia_com_chaves(cfg):
-    cfg.chaves["PEXELS_API_KEY"] = "a"
+def test_criar_cadeia_so_pixabay(cfg):
+    cfg.chaves["PEXELS_API_KEY"] = "a"  # sobra de configurações antigas: ignorada
     cfg.chaves["PIXABAY_API_KEY"] = "b"
     cadeia = criar_cadeia(cfg, cfg.canais["teste"], 1080, 1920)
-    assert [type(p) for p in cadeia] == [PexelsImagens, PixabayImagens, FundoProcedural]
+    assert [type(p) for p in cadeia] == [PixabayImagens, FundoProcedural]

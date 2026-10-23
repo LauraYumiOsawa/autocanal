@@ -89,8 +89,8 @@ def ctx(cfg, con, videos):
         "texto": "…", "palavras": [{"texto": "sal.", "inicio": 34.2, "fim": 34.6}],
     })
     gravar_json(c, "fontes_midia.json", [
-        {"caminho": f"visuais/seg_{i:02d}.jpg", "tipo": "imagem", "origem": "pexels",
-         "url": f"https://pexels.com/{i}", "licenca": "Pexels License", "autor": "Ana"}
+        {"caminho": f"visuais/seg_{i:02d}.jpg", "tipo": "imagem", "origem": "pixabay",
+         "url": f"https://pixabay.com/{i}", "licenca": "Pixabay Content License", "autor": "Ana"}
         for i in range(1, 5)
     ])
     gravar_json(c, "metadados.json", {

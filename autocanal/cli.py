@@ -93,7 +93,7 @@ def diagnostico(ctx: typer.Context) -> None:
     resultados.append(
         _linha(cfg.client_secret.exists(), "client_secret.json", str(cfg.client_secret))
     )
-    for nome in ("PEXELS_API_KEY", "PIXABAY_API_KEY", "GOOGLE_TTS_API_KEY", "YOUTUBE_API_KEY"):
+    for nome in ("PIXABAY_API_KEY", "GOOGLE_TTS_API_KEY", "YOUTUBE_API_KEY"):
         definida = bool(cfg.chaves.get(nome))
         typer.echo(f"[{'OK   ' if definida else 'FALHA'}] {nome}: {'definida' if definida else 'ausente'}")
     tokens = sorted((cfg.dados / "tokens").glob("*.json")) if (cfg.dados / "tokens").is_dir() else []

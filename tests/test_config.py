@@ -19,8 +19,8 @@ def test_carregar_resolve_caminhos(raiz_teste):
 
 def test_segredos_opcionais(raiz_teste):
     assert carregar(raiz_teste).chaves == {}
-    (raiz_teste / "config" / "segredos.env").write_text("PEXELS_API_KEY=abc\n")
-    assert carregar(raiz_teste).chaves["PEXELS_API_KEY"] == "abc"
+    (raiz_teste / "config" / "segredos.env").write_text("PIXABAY_API_KEY=abc\n")
+    assert carregar(raiz_teste).chaves["PIXABAY_API_KEY"] == "abc"
 
 
 def test_segredos_sem_aspas(raiz_teste):

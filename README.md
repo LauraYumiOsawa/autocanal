@@ -13,7 +13,7 @@ Criação e publicação automática de vídeos no YouTube (Plano 1: núcleo + `
 2. Verificar o telefone dos canais (miniaturas personalizadas e vídeos > 15 min).
 3. Google Cloud: ativar YouTube Data API v3, YouTube Analytics API e Cloud Text-to-Speech; tela de consentimento em **In production**; adicionar `http://localhost:8080/` em URIs de redirecionamento autorizados do client; criar chave de API (TTS e pesquisa).
 4. Conta de faturamento no projeto (exigida pelo TTS, mesmo na camada grátis) — ou optar só pelo Kokoro.
-5. Contas Pexels e Pixabay → chaves de API em `config/segredos.env` (**obrigatórias** para visuais de qualidade: sem elas tudo vira imagem procedural, a revisão tende a reprovar e o resumo diário alerta).
+5. Conta Pixabay → chave de API em `config/segredos.env` (**obrigatória** para visuais de qualidade: sem ela tudo vira imagem procedural, a revisão tende a reprovar e o resumo diário alerta).
 6. Rodar `autocanal auth conteudo` e `autocanal auth musica` (login único por canal).
 7. Enviar o formulário de auditoria da YouTube API (necessário para vídeos públicos).
 8. Confirmar e rodar `autocanal instalar-timer`. **Não habilite o timer antes de a auditoria ser aprovada**: uploads de projetos não auditados ficam presos em privado (o `status` e o resumo alertam quando um agendado passa 2 h do horário sem ficar público).
