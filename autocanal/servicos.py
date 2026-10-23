@@ -10,6 +10,10 @@ import requests
 from autocanal.provedores import ErroProvedor
 
 
+class ServicoIndisponivel(ErroProvedor):
+    """O Docker não subiu o serviço: falha do sistema, não do job."""
+
+
 def _compose(nome: str, raiz: Path) -> list[str]:
     return ["docker", "compose", "-f", str(raiz / "servicos" / nome / "docker-compose.yml")]
 
@@ -34,7 +38,9 @@ def garantir(
     try:
         executar([*_compose(nome, raiz), "up", "-d"], check=True, capture_output=True)
     except (subprocess.CalledProcessError, OSError) as e:
-        raise ErroProvedor(f"não consegui subir o serviço {nome}: {type(e).__name__}") from None
+        raise ServicoIndisponivel(
+            f"não consegui subir o serviço {nome}: {type(e).__name__}"
+        ) from None
     limite = time.monotonic() + timeout_s
     while time.monotonic() < limite:
         if _saudavel(url_saude, obter):

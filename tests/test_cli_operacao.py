@@ -369,7 +369,8 @@ def test_instalar_timer_so_escreve(raiz_teste, rodar, home):
     assert r.exit_code == 0, r.output
     unidades = casa / ".config" / "systemd" / "user"
     servico = (unidades / "autocanal.service").read_text()
-    assert f"ExecStart={raiz_teste}/.venv/bin/autocanal --raiz {raiz_teste} tick" in servico
+    assert f'ExecStart="{raiz_teste}/.venv/bin/autocanal" --raiz "{raiz_teste}" tick' in servico
+    assert f"Environment=PATH={Path.home()}/.local/bin:/usr/local/bin:/usr/bin:/bin" in servico
     assert "Type=oneshot" in servico
     assert "SuccessExitStatus=2" in servico  # tick pulado pela trava não é falha
     timer = (unidades / "autocanal.timer").read_text()

@@ -94,6 +94,10 @@ def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
     if pausa is not None and agora < pausa:
         avisos.append(f"Claude pausado por limite de uso do plano até {_hora(cfg, pausa)}:"
                       " a produção retoma depois.")
+    sistema = produtor.pausa_sistema(cfg)
+    if sistema is not None and agora < sistema[0]:
+        avisos.append(f"Produção pausada até {_hora(cfg, sistema[0])} por queda geral"
+                      f" ({sistema[1] or 'motivo desconhecido'}): verifique o serviço.")
     recuo = planejador.planejar_apos(cfg)
     if recuo is not None and agora < recuo:
         avisos.append(f"Planejamento automático adiado até {_hora(cfg, recuo)} por falha ao"

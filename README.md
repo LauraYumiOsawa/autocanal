@@ -23,5 +23,6 @@ Criação e publicação automática de vídeos no YouTube (Plano 1: núcleo + `
 2. `uv run autocanal auth conteudo` (e `musica`)
 3. `uv run autocanal planejar`
 4. `uv run autocanal tick` (o timer: `uv run autocanal instalar-timer --ativar`)
+5. Para o timer do usuário rodar sem sessão aberta (após reiniciar a máquina): `loginctl enable-linger $USER`. O serviço já leva `~/.local/bin` no `PATH`; o `claude.bin` da configuração é resolvido para caminho absoluto ao carregar.
 
 Para uma prova local sem enviar nada: `autocanal novo teste short "tema"` e `autocanal produzir <job>` (o canal `teste` tem grade vazia). Veja `CLAUDE.md` para as regras de segurança.

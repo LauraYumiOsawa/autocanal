@@ -30,6 +30,10 @@ class LimiteUsoClaude(ErroClaude):
     pass
 
 
+class ErroClaudeIndisponivel(ErroClaude):
+    """O CLI do Claude não pode rodar (binário ausente/sem permissão): falha do sistema."""
+
+
 def regras_negadas(raiz: Path) -> list[str]:
     """Regras `--disallowedTools` que impedem o Claude headless de ler/alterar segredos.
 
@@ -125,11 +129,17 @@ def chamar(
         except subprocess.TimeoutExpired:
             motivo = f"timeout após {timeout_s}s"
             continue
+        except (FileNotFoundError, PermissionError) as e:
+            raise ErroClaudeIndisponivel(
+                f"não consegui executar {claude_bin}: {type(e).__name__}"
+            ) from None
         try:
             return _interpretar(proc.stdout, schema)
         except LimiteUsoClaude:
             raise
         except ErroClaude as e:
+            if proc.returncode != 0 and _LIMITE.search(proc.stderr or ""):
+                raise LimiteUsoClaude((proc.stderr or "").strip()[:500]) from None
             motivo = str(e)
             if proc.returncode != 0 and not proc.stdout.strip():
                 motivo = f"claude saiu com código {proc.returncode}: {proc.stderr.strip()[:500]}"

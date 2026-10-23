@@ -190,6 +190,18 @@ def test_tick_pula_producao_durante_pausa_do_claude(cfg_nicho, con):
     assert "produzir" in fases.ordem
 
 
+def test_tick_pula_producao_durante_pausa_do_sistema(cfg_nicho, con):
+    fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
+    meia_hora_atras = AGORA.astimezone(UTC) - timedelta(minutes=30)
+    produtor.pausar_sistema(cfg_nicho, "docker parado", meia_hora_atras)
+    fases = Fases()
+    _tick(cfg_nicho, con, fases)
+    assert "produzir" not in fases.ordem and "planejar" not in fases.ordem
+    fases = Fases()
+    _tick(cfg_nicho, con, fases, AGORA + timedelta(minutes=31))
+    assert "produzir" in fases.ordem
+
+
 def test_tick_limite_do_claude_no_planejamento_pausa(cfg_nicho, con):
     fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
     fases = Fases()

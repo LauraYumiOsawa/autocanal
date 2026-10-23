@@ -30,3 +30,14 @@ def test_slot_hora_invalida():
 
 def test_canal_sem_nicho_padrao_vazio(cfg):
     assert cfg.canais["teste"].nicho == ""
+
+
+def test_carregar_resolve_bin_do_claude(raiz_teste, monkeypatch, tmp_path):
+    from autocanal import config
+
+    monkeypatch.setattr(config.shutil, "which", lambda nome: f"/opt/bin/{nome}")
+    assert carregar(raiz_teste).claude.bin == "/opt/bin/claude"
+    monkeypatch.setattr(config.shutil, "which", lambda nome: None)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert config.resolver_bin_claude("claude") == str(tmp_path / ".local" / "bin" / "claude")
+    assert config.resolver_bin_claude("/x/claude") == "/x/claude"

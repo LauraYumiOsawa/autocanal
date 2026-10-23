@@ -3,11 +3,18 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from autocanal import etapas, fila
-from autocanal.claude import LimiteUsoClaude
+from autocanal.claude import ErroClaudeIndisponivel, LimiteUsoClaude
 from autocanal.db import conectar
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
-from autocanal.produtor import MAX_TENTATIVAS_ETAPA, pausa_claude_ate, pausar_claude, produzir
+from autocanal.produtor import (
+    MAX_TENTATIVAS_ETAPA,
+    pausa_claude_ate,
+    pausa_sistema,
+    pausar_claude,
+    produzir,
+)
+from autocanal.servicos import ServicoIndisponivel
 
 PUBLICAR = datetime(2026, 11, 2, 15, 0, tzinfo=UTC)
 ETAPAS = FORMATOS["short"].etapas
@@ -106,6 +113,30 @@ def test_produzir_limite_uso_nao_conta_tentativa(cfg, con, job):
     esperado = datetime.now(UTC) + timedelta(hours=1)
     assert abs(ate - esperado) < timedelta(seconds=30)
     assert (cfg.dados / "pausa_claude_ate").read_text() == ate.isoformat()
+
+
+@pytest.mark.parametrize("erro", [
+    ErroClaudeIndisponivel("não consegui executar claude: FileNotFoundError"),
+    ServicoIndisponivel("não consegui subir o serviço kokoro: CalledProcessError"),
+])
+def test_produzir_queda_geral_pausa_sem_contar_tentativa(cfg, con, job, erro):
+    chamadas: list[str] = []
+    fila.marcar_etapa(con, job.id, "roteiro", "erro", "falha anterior")
+
+    def cai(ctx):
+        chamadas.append("roteiro")
+        raise erro
+
+    for _ in range(MAX_TENTATIVAS_ETAPA + 1):
+        assert produzir(cfg, con, job.id, registro=_registro(chamadas, roteiro=cai)) == (
+            Estado.PRODUZINDO
+        )
+    assert fila.tentativas_etapa(con, job.id, "roteiro") == 1  # só a falha anterior
+    assert fila.estado_etapa(con, job.id, "roteiro") == "erro"
+    ate, motivo = pausa_sistema(cfg)
+    assert abs(ate - (datetime.now(UTC) + timedelta(hours=1))) < timedelta(seconds=30)
+    assert motivo == str(erro)
+    assert pausa_claude_ate(cfg) is None
 
 
 def test_pausa_claude_ate_ilegivel(cfg):

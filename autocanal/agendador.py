@@ -13,7 +13,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from autocanal import fila, grade, planejador, produtor, relatorio
-from autocanal.claude import LimiteUsoClaude
+from autocanal.claude import ErroClaudeIndisponivel, LimiteUsoClaude
 from autocanal.config import Config
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
@@ -71,9 +71,17 @@ def fila_curta(cfg: Config, con: sqlite3.Connection, agora: datetime) -> bool:
     return False
 
 
+def _pausa_ativa(cfg: Config, agora: datetime) -> datetime | None:
+    """Fim da pausa vigente (limite do Claude ou queda geral), ou None."""
+    fins = [produtor.pausa_claude_ate(cfg)]
+    sistema = produtor.pausa_sistema(cfg)
+    fins.append(sistema[0] if sistema else None)
+    ativos = [f for f in fins if f is not None and agora < f]
+    return max(ativos) if ativos else None
+
+
 def _claude_livre(cfg: Config, agora: datetime) -> bool:
-    ate = produtor.pausa_claude_ate(cfg)
-    return ate is None or agora >= ate
+    return _pausa_ativa(cfg, agora) is None
 
 
 def _planejar_liberado(cfg: Config, agora: datetime) -> bool:
@@ -122,13 +130,15 @@ def _passo(cfg, con, agora, relogio, planejar_fn, produzir_fn, publicar_fn, sinc
     except LimiteUsoClaude:
         ate = produtor.pausar_claude(cfg, agora)
         log.warning("limite de uso do Claude ao planejar; pausa até %s", ate.isoformat())
+    except ErroClaudeIndisponivel as e:
+        ate = produtor.pausar_sistema(cfg, str(e), agora)
+        log.warning("Claude indisponível ao planejar (%s); pausa até %s", e, ate.isoformat())
     except Exception:
         log.exception("tick: falha ao planejar")
 
     try:
-        if not _claude_livre(cfg, relogio()):
-            log.info("Claude em pausa até %s: produção pulada",
-                     produtor.pausa_claude_ate(cfg).isoformat())
+        if (ate := _pausa_ativa(cfg, relogio())) is not None:
+            log.info("produção em pausa até %s: pulada", ate.isoformat())
         elif (job := fila.proximo_para_produzir(con)) is not None:
             r.produzido = job.id
             produzir_fn(cfg, con, job.id)

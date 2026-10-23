@@ -216,6 +216,19 @@ def marcar_etapa(
     con.commit()
 
 
+def restaurar_etapa(
+    con: sqlite3.Connection, job_id: str, nome: str, estado: str | None
+) -> None:
+    """Volta a etapa ao `estado` anterior (None apaga a linha), sem mexer nas tentativas."""
+    if estado is None:
+        resetar_etapas(con, job_id, [nome])
+        return
+    con.execute(
+        "UPDATE etapas SET estado = ? WHERE job_id = ? AND nome = ?", (estado, job_id, nome)
+    )
+    con.commit()
+
+
 def resetar_etapas(con: sqlite3.Connection, job_id: str, nomes: list[str]) -> None:
     con.executemany(
         "DELETE FROM etapas WHERE job_id = ? AND nome = ?", [(job_id, n) for n in nomes]

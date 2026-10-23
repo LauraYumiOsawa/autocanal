@@ -130,6 +130,15 @@ def test_alerta_canal_sem_autorizacao_com_aprovados(cfg, con):
     assert len(alertas) == 1 and "autocanal auth teste" in alertas[0]
 
 
+def test_alerta_pausa_por_queda_geral(cfg, con):
+    agora = datetime.now(UTC)
+    produtor.pausar_sistema(cfg, "não consegui subir o serviço kokoro: OSError", agora)
+    alertas = relatorio.alertas(cfg, con, agora)
+    assert len(alertas) == 1
+    assert "queda geral" in alertas[0] and "kokoro" in alertas[0]
+    assert relatorio.alertas(cfg, con, agora + timedelta(hours=2)) == []
+
+
 def test_notificar_sem_notify_send(monkeypatch):
     monkeypatch.setattr(relatorio.shutil, "which", lambda nome: None)
     monkeypatch.setattr(relatorio.subprocess, "run", pytest.fail)

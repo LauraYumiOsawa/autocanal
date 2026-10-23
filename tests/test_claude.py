@@ -106,6 +106,36 @@ def test_limite_de_uso(claude_falso, tmp_path):
     assert len(claude_falso.chamadas()) == 1
 
 
+def test_binario_ausente_e_indisponivel(tmp_path):
+    from autocanal.claude import ErroClaudeIndisponivel
+
+    chamadas = []
+
+    def executar(argv, **k):
+        chamadas.append(argv)
+        raise FileNotFoundError(2, "No such file", argv[0])
+
+    with pytest.raises(ErroClaudeIndisponivel):
+        chamar("oi", SCHEMA, [], tmp_path, claude_bin="/nao/existe", executar=executar)
+    assert len(chamadas) == 1  # sem retentativa: é falha do sistema
+
+    def sem_permissao(argv, **k):
+        raise PermissionError(13, "Permission denied")
+
+    with pytest.raises(ErroClaudeIndisponivel):
+        chamar("oi", SCHEMA, [], tmp_path, executar=sem_permissao)
+
+
+def test_limite_de_uso_no_stderr(tmp_path):
+    import subprocess
+
+    def executar(argv, **k):
+        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="Error: weekly limit reached")
+
+    with pytest.raises(LimiteUsoClaude):
+        chamar("oi", SCHEMA, [], tmp_path, executar=executar)
+
+
 def test_timeout_conta_como_tentativa_falha(tmp_path):
     import subprocess
 

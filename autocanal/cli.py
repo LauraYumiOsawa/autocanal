@@ -423,7 +423,8 @@ Description=autocanal: um passo do agendador (planejar, produzir, publicar)
 
 [Service]
 Type=oneshot
-ExecStart={exe} --raiz {raiz} tick
+Environment=PATH={local_bin}:/usr/local/bin:/usr/bin:/bin
+ExecStart="{exe}" --raiz "{raiz}" tick
 # 2 = tick pulado porque outro processo do autocanal segura a trava: não é falha
 SuccessExitStatus=2
 """
@@ -452,7 +453,8 @@ def instalar_timer(
     destino.mkdir(parents=True, exist_ok=True)
     exe = raiz / ".venv" / "bin" / "autocanal"
     (destino / "autocanal.service").write_text(
-        _SERVICO.format(exe=exe, raiz=raiz), encoding="utf-8"
+        _SERVICO.format(exe=exe, raiz=raiz, local_bin=Path.home() / ".local" / "bin"),
+        encoding="utf-8",
     )
     (destino / "autocanal.timer").write_text(_TIMER, encoding="utf-8")
     typer.echo(f"escritos: {destino / 'autocanal.service'}, {destino / 'autocanal.timer'}")

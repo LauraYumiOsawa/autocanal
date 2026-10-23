@@ -1,7 +1,9 @@
 """Configuração do autocanal: carrega YAMLs e segredos, valida com pydantic."""
 from __future__ import annotations
 
+import os
 import re
+import shutil
 from pathlib import Path
 from typing import Literal
 
@@ -118,6 +120,20 @@ def _ler_segredos(arquivo: Path) -> dict[str, str]:
     return chaves
 
 
+def resolver_bin_claude(valor: str) -> str:
+    """Caminho absoluto do CLI do Claude (o systemd não tem o PATH do shell).
+
+    Absoluto fica como está; senão `shutil.which`; senão `~/.local/bin/<valor>`.
+    """
+    p = Path(valor).expanduser()
+    if p.is_absolute():
+        return str(p)
+    achado = shutil.which(valor)
+    if achado:
+        return os.path.abspath(achado)  # sem resolve(): o link em ~/.local/bin sobrevive a updates
+    return str(Path.home() / ".local" / "bin" / valor)
+
+
 def carregar(raiz: Path) -> Config:
     raiz = Path(raiz).expanduser()
     base = _ler_yaml(raiz / "config" / "autocanal.yaml")
@@ -132,6 +148,10 @@ def carregar(raiz: Path) -> Config:
         dados["fonte_arquivo"] = _caminho(raiz, dados["fonte_arquivo"])
         dados["perfil_voz"] = _caminho(raiz, dados["perfil_voz"])
         canais[slug] = Canal(slug=slug, **dados)
+
+    claude_cfg = dict(base.get("claude") or {})
+    claude_cfg["bin"] = resolver_bin_claude(str(claude_cfg.get("bin") or "claude"))
+    base["claude"] = claude_cfg
 
     chaves = _ler_segredos(raiz / "config" / "segredos.env")
     return Config(

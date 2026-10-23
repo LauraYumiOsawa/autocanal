@@ -8,11 +8,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from autocanal import etapas, fila
-from autocanal.claude import LimiteUsoClaude
+from autocanal.claude import ErroClaudeIndisponivel, LimiteUsoClaude
 from autocanal.config import Config
 from autocanal.etapas.base import PROBLEMAS_REVISAO, ErroEtapa, contexto_para
 from autocanal.fila import Estado, Job
 from autocanal.formatos import FORMATOS
+from autocanal.servicos import ServicoIndisponivel
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +41,33 @@ def pausa_claude_ate(cfg: Config) -> datetime | None:
     except (OSError, ValueError):
         return None
     return ate.replace(tzinfo=UTC) if ate.tzinfo is None else ate
+
+
+def _marcador_sistema(cfg: Config) -> Path:
+    return cfg.dados / "pausa_sistema_ate"
+
+
+def pausar_sistema(cfg: Config, motivo: str, agora: datetime | None = None) -> datetime:
+    """Grava `dados/pausa_sistema_ate` (agora + 1 h e o motivo) e devolve esse horário.
+
+    Para quedas gerais (Claude ou Docker indisponíveis): não são culpa do job.
+    """
+    ate = ((agora or datetime.now(UTC)) + PAUSA_CLAUDE).astimezone(UTC)
+    cfg.dados.mkdir(parents=True, exist_ok=True)
+    motivo = " ".join(motivo.split())
+    _marcador_sistema(cfg).write_text(f"{ate.isoformat()}\n{motivo}\n", encoding="utf-8")
+    return ate
+
+
+def pausa_sistema(cfg: Config) -> tuple[datetime, str] | None:
+    """(fim, motivo) da pausa por queda geral (None se não houver marcador legível)."""
+    try:
+        linhas = _marcador_sistema(cfg).read_text(encoding="utf-8").splitlines()
+        ate = datetime.fromisoformat(linhas[0].strip())
+    except (OSError, ValueError, IndexError):
+        return None
+    ate = ate.replace(tzinfo=UTC) if ate.tzinfo is None else ate
+    return ate, (linhas[1].strip() if len(linhas) > 1 else "")
 
 
 def produzir(
@@ -73,6 +101,7 @@ def produzir(
             ctx.job = fila.obter(con, job_id)
             if nome == "revisao" and ctx.job.estado == Estado.PRODUZINDO:
                 ctx.job = fila.mudar_estado(con, job_id, Estado.EM_REVISAO)
+            anterior = fila.estado_etapa(con, job_id, nome)
             fila.marcar_etapa(con, job_id, nome, "rodando")
             try:
                 etapa = registro.get(nome)
@@ -85,6 +114,13 @@ def produzir(
                 ate = pausar_claude(cfg)
                 log.warning("limite de uso do Claude em %s/%s; produção pausada até %s",
                             job_id, nome, ate.isoformat())
+                fila.restaurar_etapa(con, job_id, nome, anterior)
+                return fila.obter(con, job_id).estado
+            except (ErroClaudeIndisponivel, ServicoIndisponivel) as e:
+                ate = pausar_sistema(cfg, str(e))
+                log.warning("queda geral em %s/%s (%s); produção pausada até %s",
+                            job_id, nome, e, ate.isoformat())
+                fila.restaurar_etapa(con, job_id, nome, anterior)
                 return fila.obter(con, job_id).estado
             except Exception as e:
                 msg = str(e) or type(e).__name__
