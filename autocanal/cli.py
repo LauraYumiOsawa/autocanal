@@ -335,9 +335,16 @@ def _declarar_sintetico(pasta: Path, rodadas: int) -> None:
         arquivo.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _ultima_revisao_aprovou(con, job_id: str) -> bool:
+    r = con.execute(
+        "SELECT aprovado FROM revisoes WHERE job_id = ? ORDER BY rodada DESC LIMIT 1", (job_id,)
+    ).fetchone()
+    return r is not None and bool(r["aprovado"])
+
+
 @app.command()
 def aprovar(ctx: typer.Context, job: str) -> None:
-    """Aprova à mão um job em quarentena (ou falhou, se o vídeo já estiver pronto)."""
+    """Aprova à mão um job em quarentena (ou falhou, se o vídeo pronto passou na revisão)."""
     cfg = carregar(ctx.obj)
     con = conectar(cfg.dados / "autocanal.db")
     with _exclusivo(cfg):
@@ -351,6 +358,10 @@ def aprovar(ctx: typer.Context, job: str) -> None:
         if j.estado == Estado.FALHOU and not prontos:
             typer.echo(f"{j.id} não tem video.mp4 e metadados.json; rode"
                        f" `autocanal produzir {j.id}`", err=True)
+            raise typer.Exit(1)
+        if j.estado == Estado.FALHOU and not _ultima_revisao_aprovou(con, j.id):
+            typer.echo(f"{j.id} não foi aprovado pela revisão; rode `autocanal revisar {j.id}`"
+                       " (ou veja o vídeo e use a quarentena)", err=True)
             raise typer.Exit(1)
         _declarar_sintetico(pasta, j.tentativas_revisao)
         fila.mudar_estado(con, j.id, Estado.APROVADO)

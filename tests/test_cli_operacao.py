@@ -324,9 +324,33 @@ def test_aprovar_falhou_exige_video_e_metadados(cfg, con, rodar):
     pasta = _pasta(cfg, j.id)
     (pasta / "video.mp4").write_bytes(b"v")
     (pasta / "metadados.json").write_text(json.dumps({"titulo": "T", "sintetico": True}))
+    _revisao(con, j.id, 1, True)
     assert rodar("aprovar", j.id).exit_code == 0
     assert fila.obter(con, j.id).estado == Estado.APROVADO
     assert json.loads((pasta / "metadados.json").read_text())["sintetico"] is True
+
+
+def _revisao(con, job_id, rodada, aprovado):
+    con.execute(
+        "INSERT INTO revisoes (job_id, rodada, aprovado, motivos_json, etapa_para_refazer,"
+        " criado_em) VALUES (?, ?, ?, '[]', NULL, '2026-10-23T00:00:00+00:00')",
+        (job_id, rodada, int(aprovado)),
+    )
+    con.commit()
+
+
+def test_aprovar_falhou_exige_revisao_aprovada(cfg, con, rodar):
+    j = _job(con, Estado.PRODUZINDO, Estado.FALHOU, erro="youtube: rejected")
+    pasta = _pasta(cfg, j.id)
+    (pasta / "video.mp4").write_bytes(b"v")
+    (pasta / "metadados.json").write_text(json.dumps({"titulo": "T"}))
+    r = rodar("aprovar", j.id)  # nunca revisado
+    assert r.exit_code == 1 and f"autocanal revisar {j.id}" in r.output
+    _revisao(con, j.id, 1, True)
+    _revisao(con, j.id, 2, False)  # a última rodada reprovou
+    r = rodar("aprovar", j.id)
+    assert r.exit_code == 1 and f"autocanal revisar {j.id}" in r.output
+    assert fila.obter(con, j.id).estado == Estado.FALHOU
 
 
 def test_aprovar_outro_estado(con, rodar):
