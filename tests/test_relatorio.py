@@ -130,6 +130,16 @@ def test_alerta_canal_sem_autorizacao_com_aprovados(cfg, con):
     assert len(alertas) == 1 and "autocanal auth teste" in alertas[0]
 
 
+def test_alerta_agendado_preso_em_privado(cfg, con):
+    con.execute("INSERT INTO canais_estado (canal, auth_ok) VALUES ('teste', 1)")
+    con.commit()
+    publish_at = datetime(2026, 10, 26, 15, tzinfo=UTC)
+    j = _job(cfg, con, Estado.AGENDADO, publish_at, video="abc")
+    assert relatorio.alertas(cfg, con, publish_at + timedelta(hours=1, minutes=59)) == []
+    [aviso] = relatorio.alertas(cfg, con, publish_at + timedelta(hours=2, minutes=1))
+    assert j.id in aviso and "projeto da API possivelmente não auditado" in aviso
+
+
 def test_alerta_visuais_so_procedurais(cfg, con):
     so_proc = _job(cfg, con, Estado.QUARENTENA, datetime(2026, 10, 27, 15, tzinfo=UTC))
     misto = _job(cfg, con, Estado.QUARENTENA, datetime(2026, 10, 28, 15, tzinfo=UTC))

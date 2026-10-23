@@ -73,6 +73,7 @@ def _quarentena(cfg: Config, con: sqlite3.Connection) -> list[str]:
     return linhas
 
 
+ATRASO_PUBLICACAO = timedelta(hours=2)
 _COM_VISUAIS = (Estado.PRODUZINDO, Estado.EM_REVISAO, Estado.QUARENTENA, Estado.APROVADO,
                 Estado.AGENDADO)
 
@@ -98,6 +99,14 @@ def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
     if pausa is not None and agora < pausa:
         avisos.append(f"Claude pausado por limite de uso do plano até {_hora(cfg, pausa)}:"
                       " a produção retoma depois.")
+    atrasados = [j for j in fila.listar(con, {Estado.AGENDADO})
+                 if j.youtube_video_id and agora > j.publish_at + ATRASO_PUBLICACAO]
+    if atrasados:
+        ids = ", ".join(f"`{j.id}`" for j in atrasados)
+        avisos.append(f"{len(atrasados)} vídeo(s) agendado(s) seguem privados mais de 2 h após o"
+                      f" horário ({ids}): projeto da API possivelmente não auditado (uploads de"
+                      " projetos não auditados ficam presos em privado). Confira no YouTube"
+                      " Studio e o formulário de auditoria.")
     for job in fila.listar(con, set(_COM_VISUAIS)):
         try:
             fontes = json.loads(

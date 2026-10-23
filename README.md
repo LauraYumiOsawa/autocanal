@@ -16,13 +16,13 @@ Criação e publicação automática de vídeos no YouTube (Plano 1: núcleo + `
 5. Contas Pexels e Pixabay → chaves de API em `config/segredos.env` (**obrigatórias** para visuais de qualidade: sem elas tudo vira imagem procedural, a revisão tende a reprovar e o resumo diário alerta).
 6. Rodar `autocanal auth conteudo` e `autocanal auth musica` (login único por canal).
 7. Enviar o formulário de auditoria da YouTube API (necessário para vídeos públicos).
-8. Confirmar e rodar `autocanal instalar-timer`.
+8. Confirmar e rodar `autocanal instalar-timer`. **Não habilite o timer antes de a auditoria ser aprovada**: uploads de projetos não auditados ficam presos em privado (o `status` e o resumo alertam quando um agendado passa 2 h do horário sem ficar público).
 
 ## Primeiro uso
 1. `uv run autocanal diagnostico`
 2. `uv run autocanal auth conteudo` (e `musica`)
 3. `uv run autocanal planejar`
-4. `uv run autocanal tick` (o timer: `uv run autocanal instalar-timer --ativar`)
+4. `uv run autocanal tick` (o timer: `uv run autocanal instalar-timer --ativar` — só depois de confirmar a auditoria aprovada e um `tick` manual sem erros)
 5. Para o timer do usuário rodar sem sessão aberta (após reiniciar a máquina): `loginctl enable-linger $USER`. O serviço já leva `~/.local/bin` no `PATH`; o `claude.bin` da configuração é resolvido para caminho absoluto ao carregar.
 
 Para uma prova local sem enviar nada: `autocanal novo teste short "tema"` e `autocanal produzir <job>` (o canal `teste` tem grade vazia). Veja `CLAUDE.md` para as regras de segurança.
