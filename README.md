@@ -8,7 +8,7 @@ Criação e publicação automática de vídeos no YouTube (Plano 1: núcleo + `
 3. Copie `config/canais.yaml.exemplo` para `config/canais.yaml` e `config/segredos.env.exemplo` para `config/segredos.env`; ajuste.
 4. Testes: `uv run pytest -q`.
 
-## Checklist de Laura (ações fora do sistema)
+## Checklist de (ações fora do sistema)
 1. Criar uma conta Google pessoal (não a corporativa) e dois canais de marca.
 2. Verificar o telefone dos canais (miniaturas personalizadas e vídeos > 15 min).
 3. Google Cloud: ativar YouTube Data API v3, YouTube Analytics API e Cloud Text-to-Speech; tela de consentimento em **In production**; adicionar `http://localhost:8080/` em URIs de redirecionamento autorizados do client; criar chave de API (TTS e pesquisa).
