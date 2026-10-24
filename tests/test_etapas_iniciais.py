@@ -471,6 +471,8 @@ def _instalar_flux_falso(cfg):
     cfg.flux.projeto.mkdir(parents=True, exist_ok=True)
     (cfg.flux.projeto / "pyproject.toml").write_text("[project]\n")
     (cfg.flux.projeto / "gerar.py").write_text("")
+    (cfg.flux.projeto / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
+    (cfg.flux.projeto / ".venv" / "bin" / "python").write_text("")
 
 
 class _FluxRegistra:
@@ -520,3 +522,27 @@ def test_visuais_flux_nao_instalado_segue(ctx, cfg, caplog):
     visuais.executar(ctx)
     assert ler_json(ctx, "fontes_midia.json")[0]["origem"] == "procedural"
     assert any("FLUX" in r.getMessage() for r in caplog.records)
+
+
+def test_visuais_refeitos_atualizam_creditos_e_sintetico(ctx, cfg, monkeypatch):
+    # revisão final: rodada 1 sem FLUX; visuais refeitos (metadados não) passam a ter FLUX
+    from autocanal import legendas as mod_legendas
+    from autocanal import servicos
+    _instalar_flux_falso(cfg)
+    cfg.canais["teste"].visuais = ["flux"]
+    monkeypatch.setattr(visuais, "GeradorFlux", _FluxRegistra([]))
+    monkeypatch.setattr(mod_legendas, "liberar_modelos", lambda: None)
+    monkeypatch.setattr(servicos, "parar_kokoro", lambda raiz: None)
+    _segmentos(ctx, ["a b", "c d"])
+    gravar_json(ctx, "metadados.json", {
+        "titulo": "T", "texto_thumb": "X", "cena_thumb": "c", "descricao": "Resumo.",
+        "descricao_final": "Resumo.\n\nImagens: Pixabay\n\nFontes:\nhttps://exemplo.org/mar\n\n#shorts",
+        "tags": [], "capitulos": [], "consultas_alvo": ["a", "b", "c"], "nota_titulo": 90,
+        "problemas_titulo": [], "sintetico": False,
+    })
+    visuais.executar(ctx)
+    m = ler_json(ctx, "metadados.json")
+    assert m["sintetico"] is True
+    assert m["descricao_final"] == (
+        "Resumo.\n\nAlgumas imagens deste vídeo foram geradas por IA.\n\n"
+        "Fontes:\nhttps://exemplo.org/mar\n\n#shorts")

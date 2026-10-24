@@ -177,6 +177,7 @@ def executar(ctx: Contexto) -> None:
         "titulo": titulo,
         "texto_thumb": texto_thumb,
         "cena_thumb": sanitizar_texto(d["cena_thumb"]).strip(),
+        "descricao": sanitizar_texto(d["descricao"]).strip(),  # base para refazer os créditos
         "descricao_final": descricao,
         "tags": cortar_tags(d["tags"]),
         "capitulos": capitulos,
@@ -186,3 +187,20 @@ def executar(ctx: Contexto) -> None:
         # imagem do FLUX é mídia sintética realista: marcação obrigatória no upload
         "sintetico": any(f.get("origem") == "flux" for f in fontes_midia),
     })
+
+
+def atualizar_creditos(ctx: Contexto) -> None:
+    """Visuais refeitos sem refazer os metadados: os créditos e a marcação de IA acompanham as
+    mídias novas (sem isso, imagem do FLUX iria ao ar sem o aviso)."""
+    if not (ctx.pasta / "metadados.json").exists():
+        return
+    meta = ler_json(ctx, "metadados.json")
+    fontes = ler_json(ctx, "fontes_midia.json")
+    meta["sintetico"] = bool(meta.get("sintetico")) or any(f.get("origem") == "flux" for f in fontes)
+    if "descricao" in meta:
+        roteiro = ler_json(ctx, "roteiro.json")
+        meta["descricao_final"] = descricao_final(
+            meta["descricao"], meta.get("capitulos", []),
+            [f["url"] for f in roteiro.get("fontes", [])], ctx.formato.nome, creditos(fontes),
+        )
+    gravar_json(ctx, "metadados.json", meta)

@@ -323,7 +323,8 @@ def revisar(ctx: typer.Context, job: str) -> None:
 
 
 def _declarar_sintetico(pasta: Path, rodadas: int) -> None:
-    """Aprovação manual: se alguma revisão viu mídia sintética, o metadados.json declara.
+    """Aprovação manual: se alguma revisão viu mídia sintética, ou há imagem do FLUX, o
+    metadados.json declara.
 
     A revisão só grava `sintetico` quando ela mesma aprova; nunca remove a declaração.
     """
@@ -334,8 +335,13 @@ def _declarar_sintetico(pasta: Path, rodadas: int) -> None:
         except (OSError, ValueError):
             continue
         vistos.append(bool(dados.get("contains_synthetic_media")))
+    try:
+        fontes = json.loads((pasta / "fontes_midia.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        fontes = []
+    flux = any(isinstance(f, dict) and f.get("origem") == "flux" for f in fontes)
     arquivo = pasta / "metadados.json"
-    if not any(vistos) or not arquivo.is_file():
+    if not (any(vistos) or flux) or not arquivo.is_file():
         return
     meta = json.loads(arquivo.read_text(encoding="utf-8"))
     if not meta.get("sintetico"):

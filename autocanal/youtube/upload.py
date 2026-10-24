@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -125,7 +126,10 @@ def enviar(
 def definir_thumbnail(youtube, video_id: str, imagem: Path, *, media_factory=MediaFileUpload) -> None:
     _executar(
         youtube.thumbnails().set(
-            videoId=video_id, media_body=media_factory(str(imagem), mimetype="image/png")
+            videoId=video_id,
+            media_body=media_factory(
+                str(imagem), mimetype=mimetypes.guess_type(imagem.name)[0] or "image/jpeg"
+            ),
         )
     )
 

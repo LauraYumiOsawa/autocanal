@@ -192,6 +192,12 @@ def _midia_procedural(ctx, cfg, con, videos):
     gravar_json(ctx, "fontes_midia.json", fontes)
 
 
+def _flux_sem_aviso(ctx, cfg, con, videos):
+    fontes = ler_json(ctx, "fontes_midia.json")
+    fontes[0].update(origem="flux", licenca="gerado localmente (FLUX.2 klein 4B, Apache 2.0)")
+    gravar_json(ctx, "fontes_midia.json", fontes)
+
+
 def _roteiro_repetido(ctx, cfg, con, videos):
     _outro_job(cfg, con, "teste", _roteiro())
 
@@ -205,6 +211,7 @@ def _roteiro_repetido(ctx, cfg, con, videos):
     (_midia_sem_licenca, "licença", ["visuais"]),
     (_midia_faltando, "3 mídias para 4 segmentos", ["visuais"]),
     (_midia_procedural, "trecho 2 sem imagem relacionada à fala", ["visuais"]),
+    (_flux_sem_aviso, "aviso de imagens geradas por IA", ["metadados"]),
     (_roteiro_repetido, "parecido", ["roteiro"]),
 ])
 def test_checagens_mapeiam_etapa(ctx, cfg, con, videos, mudar, trecho, etapas_esperadas):

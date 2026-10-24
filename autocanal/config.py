@@ -90,7 +90,6 @@ class ConfigFlux(BaseModel):
     """FLUX.2 [klein] 4B em lote no projeto uv `projeto` (caminhos já resolvidos pela raiz)."""
 
     projeto: Path = Path("servicos/flux")
-    uv: Path = Path.home() / ".local/share/autocanal-tools/bin/uv"
     passos: int = 4
     largura: int = 1360  # paisagem; o retrato inverte
     altura: int = 768
@@ -179,8 +178,6 @@ def carregar(raiz: Path) -> Config:
 
     flux_cfg = dict(base.get("flux") or {})
     flux_cfg["projeto"] = _caminho(raiz, flux_cfg.get("projeto", "servicos/flux"))
-    if "uv" in flux_cfg:
-        flux_cfg["uv"] = _caminho(raiz, flux_cfg["uv"])
     base["flux"] = flux_cfg
 
     claude_cfg = dict(base.get("claude") or {})

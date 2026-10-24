@@ -2,6 +2,7 @@
 """`gerar.py` falso do FLUX: segue o contrato (entrada.json → <id>.png + resultado.json).
 Prompt com FALHAR → item ok=false; TRAVAR → dorme 5 s; QUEBRAR → sai com código 3."""
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -18,6 +19,7 @@ def main() -> int:
             print("erro ao carregar o modelo", file=sys.stderr)
             return 3
         if "TRAVAR" in item["prompt"]:
+            (saida / "pid.txt").write_text(str(os.getpid()))
             time.sleep(5)
         if "FALHAR" in item["prompt"]:
             itens.append({"id": item["id"], "ok": False, "erro": "CUDA out of memory"})

@@ -11,4 +11,3 @@ claude:
   max_turns: {roteiro: 30, metadados: 20, revisao: 30, temas: 15, curadoria: 25}
 flux:
   projeto: servicos/flux
-  uv: ~/.local/share/autocanal-tools/bin/uv

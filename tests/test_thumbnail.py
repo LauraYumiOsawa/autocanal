@@ -99,6 +99,8 @@ def test_thumbnail_usa_flux_primeiro(ctx, cfg, monkeypatch):
     cfg.flux.projeto.mkdir(parents=True)
     (cfg.flux.projeto / "pyproject.toml").write_text("[project]\n")
     (cfg.flux.projeto / "gerar.py").write_text("")
+    (cfg.flux.projeto / ".venv" / "bin").mkdir(parents=True)
+    (cfg.flux.projeto / ".venv" / "bin" / "python").write_text("")
     cfg.canais["teste"].visuais = ["pixabay", "flux"]
     recebidos = []
 

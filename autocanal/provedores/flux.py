@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 
@@ -19,8 +21,27 @@ log = logging.getLogger(__name__)
 LICENCA = "gerado localmente (FLUX.2 klein 4B, Apache 2.0)"
 
 
+def _python(cfg: Config) -> Path:
+    return cfg.flux.projeto / ".venv" / "bin" / "python"
+
+
 def instalado(cfg: Config) -> bool:
-    return (cfg.flux.projeto / "pyproject.toml").is_file() and (cfg.flux.projeto / "gerar.py").is_file()
+    """Código no git não basta: precisa do ambiente criado com `uv sync --project servicos/flux`."""
+    return _python(cfg).is_file() and (cfg.flux.projeto / "gerar.py").is_file()
+
+
+def rodar_em_grupo(cmd: list[str], timeout: float) -> subprocess.CompletedProcess:
+    """Roda em sessão própria; no timeout mata o grupo inteiro (o python do FLUX pode ser neto
+    do comando e, órfão, seguraria ~7 GB da placa)."""
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            start_new_session=True)
+    try:
+        saida, erro = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.communicate()
+        raise
+    return subprocess.CompletedProcess(cmd, proc.returncode, saida, erro)
 
 
 def memoria_livre() -> tuple[float, float]:
@@ -71,7 +92,7 @@ class GeradorFlux:
         estilo_visual: str,
         estilo_ia: str = "",
         comando_base: list[str] | None = None,
-        executar=subprocess.run,
+        executar=rodar_em_grupo,
         memoria=memoria_livre,
     ):
         self.cfg = cfg
@@ -79,10 +100,9 @@ class GeradorFlux:
         self.rodada = rodada
         self.estilo_visual = estilo_visual
         self.estilo_ia = estilo_ia
-        f = cfg.flux
-        self.comando_base = comando_base or [
-            str(f.uv), "run", "--project", str(f.projeto), "python", str(f.projeto / "gerar.py"),
-        ]
+        # o python do ambiente direto, sem `uv run`: nada de sincronizar, baixar pacotes ou
+        # reescrever o uv.lock no meio da produção
+        self.comando_base = comando_base or [str(_python(cfg)), str(cfg.flux.projeto / "gerar.py")]
         self.executar = executar
         self.memoria = memoria
 
@@ -116,7 +136,7 @@ class GeradorFlux:
         timeout = f.timeout_base_s + f.timeout_por_item_s * len(itens)
         try:
             r = self.executar([*self.comando_base, str(entrada), str(lote / "saida")],
-                              capture_output=True, text=True, timeout=timeout)
+                              timeout=timeout)
         except subprocess.TimeoutExpired:
             raise ErroProvedor(f"FLUX excedeu {timeout}s") from None
         except OSError as e:

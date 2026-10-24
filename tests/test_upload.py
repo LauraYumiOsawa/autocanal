@@ -186,3 +186,12 @@ def test_vetar_repassa_feito_para_criancas():
     upload.vetar(yt, "abc", False, True)
     corpo = yt.videos.return_value.update.call_args.kwargs["body"]
     assert corpo["status"]["selfDeclaredMadeForKids"] is True
+
+
+@pytest.mark.parametrize("nome, tipo", [("t.jpg", "image/jpeg"), ("t.png", "image/png")])
+def test_definir_thumbnail_tipo_pelo_arquivo(tmp_path, nome, tipo):
+    img = tmp_path / nome
+    img.write_bytes(b"x")
+    fabrica = MagicMock()
+    upload.definir_thumbnail(MagicMock(), "abc", img, media_factory=fabrica)
+    assert fabrica.call_args.kwargs["mimetype"] == tipo

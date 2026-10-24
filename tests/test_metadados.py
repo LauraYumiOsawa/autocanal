@@ -118,6 +118,7 @@ def test_metadados_grava_json(ctx, cfg, claude_falso):
         "titulo": "Por que o mar é salgado? 3 motivos",
         "texto_thumb": "SAL ESCONDIDO",
         "cena_thumb": "salt crystals glowing on a dark rock by the sea",
+        "descricao": "O sal do mar vem das rochas ‹de verdade›.",
         "descricao_final": (
             "O sal do mar vem das rochas ‹de verdade›.\n\nFontes:\n"
             f"{URLS[0]}\n{URLS[1]}\n\n#shorts"
@@ -237,3 +238,11 @@ def test_metadados_medio_calcula_capitulos_e_sintetico(cfg, con, claude_falso):
     assert "00:40 S1" in m["descricao_final"]
     assert "Imagens: Pixabay\nAlgumas imagens deste vídeo foram geradas por IA." in m["descricao_final"]
     assert not m["descricao_final"].endswith("#shorts")
+
+
+def test_metadados_guarda_descricao_base(ctx, cfg, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    gravar_json(ctx, "roteiro.json", {"segmentos": [{"texto": "x", "visual": "v"}], "fontes": []})
+    claude_falso.responder(_ok(_metadados()))
+    metadados.executar(ctx)
+    assert ler_json(ctx, "metadados.json")["descricao"] == "O sal do mar vem das rochas ‹de verdade›."

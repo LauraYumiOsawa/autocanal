@@ -450,4 +450,17 @@ def test_diagnostico_mostra_flux(rodar, monkeypatch, cfg):
     cfg.flux.projeto.mkdir(parents=True)
     (cfg.flux.projeto / "pyproject.toml").write_text("[project]\n")
     (cfg.flux.projeto / "gerar.py").write_text("")
+    (cfg.flux.projeto / ".venv" / "bin").mkdir(parents=True)
+    (cfg.flux.projeto / ".venv" / "bin" / "python").write_text("")
     assert "[OK   ] flux" in rodar("diagnostico").output
+
+
+def test_aprovar_declara_sintetico_com_midia_do_flux(cfg, con, rodar):
+    j = _job(con, *QUARENTENA)
+    fila.atualizar(con, j.id, tentativas_revisao=2)
+    pasta = _pasta(cfg, j.id)
+    (pasta / "metadados.json").write_text(json.dumps({"titulo": "T", "sintetico": False}))
+    (pasta / "fontes_midia.json").write_text(json.dumps([{"origem": "pixabay"}, {"origem": "flux"}]))
+    (pasta / "revisao_1.json").write_text(json.dumps({"origem": "checagens", "aprovado": False}))
+    assert rodar("aprovar", j.id).exit_code == 0
+    assert json.loads((pasta / "metadados.json").read_text())["sintetico"] is True

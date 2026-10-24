@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image
 
 from autocanal import claude, fila
+from autocanal.etapas.metadados import AVISO_IA
 from autocanal.etapas.base import (
     PROBLEMAS_REVISAO,
     Contexto,
@@ -172,6 +173,11 @@ def checagens(ctx: Contexto) -> list[tuple[str, str]]:
         if f.get("origem") == "procedural":
             problemas.append((f"trecho {i} sem imagem relacionada à fala (fundo procedural)",
                               "visuais"))
+    if any(f.get("origem") == "flux" for f in fontes) and (
+        AVISO_IA not in meta.get("descricao_final", "") or not meta.get("sintetico")
+    ):
+        problemas.append(("descrição ou marcação sem o aviso de imagens geradas por IA",
+                          "metadados"))
 
     if "thumbnail" in ctx.formato.etapas:
         problemas.extend(_checar_thumbnail(ctx.pasta / "thumbnail.jpg"))

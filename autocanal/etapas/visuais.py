@@ -8,6 +8,7 @@ import shutil
 from autocanal import claude
 from autocanal.claude import ErroClaude, ErroClaudeIndisponivel, LimiteUsoClaude
 from autocanal.etapas.base import Contexto, ErroEtapa, carregar_prompt, gravar_json, ler_json
+from autocanal.etapas.metadados import atualizar_creditos
 from autocanal.provedores import flux
 from autocanal.provedores.curadoria import CuradoriaPixabay, Escolher, ItemCuradoria
 from autocanal.provedores.flux import GeradorFlux
@@ -110,3 +111,4 @@ def executar(ctx: Contexto) -> None:
     ]
     obtidas = resolver(cadeia, pedidos, fmt.orientacao, excluir)
     gravar_json(ctx, "fontes_midia.json", [obtidas[p.id].como_dict() for p in pedidos])
+    atualizar_creditos(ctx)

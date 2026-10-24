@@ -83,9 +83,41 @@ def test_semente_muda_com_rodada():
     assert 0 <= flux.semente("j", "seg_01", 0) < 2**31
 
 
-def test_instalado(cfg):
-    assert flux.instalado(cfg) is False
+def test_instalado_exige_ambiente(cfg):
     cfg.flux.projeto.mkdir(parents=True)
     (cfg.flux.projeto / "pyproject.toml").write_text("[project]\n")
     (cfg.flux.projeto / "gerar.py").write_text("")
+    assert flux.instalado(cfg) is False  # código no git não basta: falta o `uv sync`
+    (cfg.flux.projeto / ".venv" / "bin").mkdir(parents=True)
+    (cfg.flux.projeto / ".venv" / "bin" / "python").write_text("")
     assert flux.instalado(cfg) is True
+
+
+def test_comando_padrao_usa_python_do_ambiente(cfg):
+    # sem `uv run`: nada de sincronizar, baixar pacotes ou reescrever o uv.lock no meio da produção
+    g = flux.GeradorFlux(cfg, job_id="j", rodada=0, estilo_visual="realista")
+    assert g.comando_base == [str(cfg.flux.projeto / ".venv" / "bin" / "python"),
+                              str(cfg.flux.projeto / "gerar.py")]
+
+
+def _estado(pid: int) -> str | None:
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+    except OSError:
+        return None
+
+
+def test_timeout_mata_o_grupo_inteiro(cfg, tmp_path):
+    # o processo de verdade é neto (uv/sh → python): matar só o filho deixaria a placa ocupada
+    import time
+    cfg.flux.timeout_base_s, cfg.flux.timeout_por_item_s = 1, 0
+    embrulho = ["sh", "-c", f'"{FALSO[0]}" "{FALSO[1]}" "$@"; echo fim', "sh"]
+    with pytest.raises(ErroProvedor, match="excedeu"):
+        _gerador(cfg, comando_base=embrulho).buscar_lote(
+            _pedidos(tmp_path, ["TRAVAR"]), "paisagem", set())
+    pid = int((tmp_path / "visuais" / "flux_lote" / "saida" / "pid.txt").read_text())
+    for _ in range(20):
+        if _estado(pid) in (None, "Z"):
+            break
+        time.sleep(0.1)
+    assert _estado(pid) in (None, "Z")
