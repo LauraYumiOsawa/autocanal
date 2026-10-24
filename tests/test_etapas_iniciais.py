@@ -553,3 +553,84 @@ def test_visuais_refeitos_atualizam_creditos_e_sintetico(ctx, cfg, monkeypatch):
     assert m["descricao_final"] == (
         "Resumo.\n\nAs imagens deste vídeo foram geradas por IA.\n\n"
         "Fontes:\nhttps://exemplo.org/mar\n\n#shorts")
+
+
+def _rodada_anterior(ctx, origem, fontes):
+    gravar_json(ctx, "fontes_midia.json", fontes)
+    gravar_json(ctx, "revisao_1.json", {"origem": origem, "aprovado": False, "problemas": ["x"]})
+
+
+class _BancoNovo:
+    nome = "novo"
+
+    def __init__(self):
+        self.pedidos = []
+
+    def buscar_lote(self, pedidos, orientacao, excluir):
+        from autocanal.provedores.imagens import MidiaObtida
+        self.pedidos.append([p.id for p in pedidos])
+        saida = {}
+        for p in pedidos:
+            caminho = Path(str(p.destino_sem_ext) + ".png")
+            caminho.write_bytes(b"novo")
+            saida[p.id] = MidiaObtida(caminho, "imagem", "flux", f"flux:novo-{p.id}", "x", "y")
+        return saida
+
+
+def test_visuais_refeitos_so_por_procedural_mantem_os_bons(ctx, monkeypatch):
+    # prova real: 11 de 12 bons na rodada 1; refazer tudo jogou fora os 11 e piorou para 9
+    bom = ctx.pasta / "visuais" / "seg_01.png"
+    bom.parent.mkdir(parents=True)
+    bom.write_bytes(b"bom")
+    _segmentos(ctx, ["a b", "c d"])
+    _rodada_anterior(ctx, "checagens", [
+        {"caminho": str(bom), "tipo": "imagem", "origem": "flux", "url": "flux:bom",
+         "licenca": "x", "autor": "y", "prompt": "p", "motivo": "ok"},
+        {"caminho": str(ctx.pasta / "visuais" / "seg_02.png"), "tipo": "imagem",
+         "origem": "procedural", "url": "procedural:1", "licenca": "x", "autor": "y"},
+    ])
+    banco = _BancoNovo()
+    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a, **k: [banco])
+    visuais.executar(ctx)
+    fontes = ler_json(ctx, "fontes_midia.json")
+    assert banco.pedidos == [["seg_02"]]
+    assert fontes[0]["url"] == "flux:bom" and Path(fontes[0]["caminho"]).read_bytes() == b"bom"
+    assert fontes[1]["url"] == "flux:novo-seg_02"
+    assert not (ctx.pasta / "visuais_mantidos").exists()
+
+
+def test_visuais_reprovados_pelo_revisor_refazem_tudo(ctx, monkeypatch):
+    bom = ctx.pasta / "visuais" / "seg_01.png"
+    bom.parent.mkdir(parents=True)
+    bom.write_bytes(b"bom")
+    _rodada_anterior(ctx, "revisor", [
+        {"caminho": str(bom), "tipo": "imagem", "origem": "flux", "url": "flux:bom",
+         "licenca": "x", "autor": "y"},
+        {"caminho": str(ctx.pasta / "visuais" / "seg_02.png"), "tipo": "imagem",
+         "origem": "procedural", "url": "procedural:1", "licenca": "x", "autor": "y"},
+    ])
+    banco = _BancoNovo()
+    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a, **k: [banco])
+    _segmentos(ctx, ["a b", "c d"])
+    visuais.executar(ctx)
+    assert banco.pedidos == [["seg_01", "seg_02"]]
+
+
+def test_visuais_roteiro_reescrito_refaz_tudo(ctx, monkeypatch):
+    import os
+    bom = ctx.pasta / "visuais" / "seg_01.png"
+    bom.parent.mkdir(parents=True)
+    bom.write_bytes(b"bom")
+    _rodada_anterior(ctx, "checagens", [
+        {"caminho": str(bom), "tipo": "imagem", "origem": "flux", "url": "flux:bom",
+         "licenca": "x", "autor": "y"},
+        {"caminho": str(ctx.pasta / "visuais" / "seg_02.png"), "tipo": "imagem",
+         "origem": "procedural", "url": "procedural:1", "licenca": "x", "autor": "y"},
+    ])
+    _segmentos(ctx, ["outra fala", "c d"])  # roteiro refeito depois dos visuais
+    futuro = (ctx.pasta / "fontes_midia.json").stat().st_mtime + 10
+    os.utime(ctx.pasta / "roteiro.json", (futuro, futuro))
+    banco = _BancoNovo()
+    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a, **k: [banco])
+    visuais.executar(ctx)
+    assert banco.pedidos == [["seg_01", "seg_02"]]

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+from pathlib import Path
 
 from autocanal import claude
 from autocanal.claude import ErroClaude, ErroClaudeIndisponivel, LimiteUsoClaude
@@ -79,14 +80,18 @@ def executar(ctx: Contexto) -> None:
     pasta = ctx.pasta / "visuais"
     # refazer (revisão reprovou): não repetir as mídias da versão anterior
     excluir: set[str] = set()
-    anterior = ctx.pasta / "fontes_midia.json"
-    if anterior.exists():
+    anteriores: list[dict] = []
+    arq_anterior = ctx.pasta / "fontes_midia.json"
+    if arq_anterior.exists():
         try:
-            excluir = {f["url"] for f in json.loads(anterior.read_text(encoding="utf-8"))}
+            anteriores = json.loads(arq_anterior.read_text(encoding="utf-8"))
+            excluir = {f["url"] for f in anteriores}
         except (ValueError, KeyError, TypeError):
-            excluir = set()
+            anteriores, excluir = [], set()
+    mantidas = _guardar(ctx, _a_manter(ctx, anteriores, len(segmentos)))
     shutil.rmtree(pasta, ignore_errors=True)
     pasta.mkdir()
+    mantidas = _devolver(ctx, mantidas, pasta)
     pixabay = None
     chave = ctx.cfg.chaves.get("PIXABAY_API_KEY")
     if chave and "pixabay" in ctx.canal.visuais:
@@ -110,7 +115,58 @@ def executar(ctx: Contexto) -> None:
         Pedido(f"seg_{i:02d}", seg["visual"], seg["texto"], seg.get("cena", ""),
                pasta / f"seg_{i:02d}")
         for i, seg in enumerate(segmentos, 1)
+        if i not in mantidas
     ]
-    obtidas = resolver(cadeia, pedidos, fmt.orientacao, excluir)
-    gravar_json(ctx, "fontes_midia.json", [obtidas[p.id].como_dict() for p in pedidos])
+    obtidas = resolver(cadeia, pedidos, fmt.orientacao, excluir) if pedidos else {}
+    gravar_json(ctx, "fontes_midia.json", [
+        mantidas[i] if i in mantidas else obtidas[f"seg_{i:02d}"].como_dict()
+        for i in range(1, len(segmentos) + 1)
+    ])
     atualizar_creditos(ctx)
+
+
+def _a_manter(ctx: Contexto, anteriores: list[dict], n_segmentos: int) -> dict[int, dict]:
+    """Visuais aprovados da rodada anterior que continuam valendo.
+
+    Só quando a reprovação veio das checagens automáticas (fundo procedural): aí o Claude não
+    julgou os visuais e refazer tudo jogaria fora as escolhas boas. Se o revisor reprovou, ou se o
+    roteiro foi reescrito depois dos visuais, tudo é refeito.
+    """
+    rodadas = sorted(ctx.pasta.glob("revisao_*.json"),
+                     key=lambda a: int(a.stem.split("_")[1]) if a.stem.split("_")[1].isdigit() else 0)
+    if not rodadas or len(anteriores) != n_segmentos:
+        return {}
+    try:
+        origem = json.loads(rodadas[-1].read_text(encoding="utf-8")).get("origem")
+    except (OSError, ValueError):
+        return {}
+    roteiro, fontes = ctx.pasta / "roteiro.json", ctx.pasta / "fontes_midia.json"
+    if origem != "checagens" or roteiro.stat().st_mtime > fontes.stat().st_mtime:
+        return {}
+    return {i: f for i, f in enumerate(anteriores, 1)
+            if f.get("origem") != "procedural" and Path(f.get("caminho", "")).is_file()}
+
+
+def _guardar(ctx: Contexto, mantidas: dict[int, dict]) -> dict[int, dict]:
+    """Tira os arquivos mantidos da pasta de visuais antes de ela ser recriada."""
+    tmp = ctx.pasta / "visuais_mantidos"
+    shutil.rmtree(tmp, ignore_errors=True)
+    if not mantidas:
+        return {}
+    tmp.mkdir()
+    guardadas = {}
+    for i, f in mantidas.items():
+        destino = tmp / Path(f["caminho"]).name
+        shutil.move(f["caminho"], destino)
+        guardadas[i] = {**f, "caminho": str(destino)}
+    return guardadas
+
+
+def _devolver(ctx: Contexto, guardadas: dict[int, dict], pasta) -> dict[int, dict]:
+    devolvidas = {}
+    for i, f in guardadas.items():
+        destino = pasta / Path(f["caminho"]).name
+        shutil.move(f["caminho"], destino)
+        devolvidas[i] = {**f, "caminho": str(destino)}
+    shutil.rmtree(ctx.pasta / "visuais_mantidos", ignore_errors=True)
+    return devolvidas
