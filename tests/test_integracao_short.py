@@ -1,13 +1,17 @@
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 from autocanal import fila
 from autocanal.db import conectar
-from autocanal.etapas import legendas
+from PIL import Image
+
+from autocanal.etapas import legendas, visuais
 from autocanal.fila import Estado
 from autocanal.legendas import Palavra
 from autocanal.midia import Midia
 from autocanal.produtor import produzir
+from autocanal.provedores.imagens import MidiaObtida
 
 
 def _ok(dados):
@@ -30,6 +34,21 @@ def _roteiro(palavras: int = 100, n: int = 4) -> dict:
     }
 
 
+class BancoFalso:
+    """Banco de imagens offline: o fundo procedural reprova na revisão, então a prova usa fotos."""
+
+    nome = "banco"
+
+    def buscar_lote(self, pedidos, orientacao, excluir):
+        saida = {}
+        for i, p in enumerate(pedidos):
+            caminho = Path(str(p.destino_sem_ext) + ".jpg")
+            Image.new("RGB", (1080, 1920), (30 * i, 90, 160)).save(caminho, format="JPEG")
+            saida[p.id] = MidiaObtida(caminho, "imagem", "banco", f"https://banco/{p.id}",
+                                      "livre", "autor", motivo="mostra a fala")
+        return saida
+
+
 def test_short_offline_gera_mp4_valido(cfg, claude_falso, monkeypatch):
     cfg.claude.bin = claude_falso.claude_bin
     claude_falso.responder(
@@ -45,6 +64,7 @@ def test_short_offline_gera_mp4_valido(cfg, claude_falso, monkeypatch):
         return [Palavra(f"p{i}", i * 0.4, i * 0.4 + 0.35) for i in range(100)]
 
     monkeypatch.setattr(legendas, "transcrever", transcrever_falso)
+    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a, **k: [BancoFalso()])
     con = conectar(cfg.dados / "autocanal.db")
     job = fila.criar_job(
         con, "teste", "short", "por que o mar é salgado", datetime(2026, 11, 2, 15, tzinfo=UTC)
