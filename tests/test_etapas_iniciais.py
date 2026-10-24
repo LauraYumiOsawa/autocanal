@@ -348,9 +348,12 @@ def _itens_curadoria(ctx, n=1):
 
 def test_escolher_com_claude_usa_modelo_e_read(ctx, cfg, claude_falso):
     cfg.claude.bin = claude_falso.claude_bin
-    claude_falso.responder(_ok({"escolhas": [{"id": "seg_01", "candidato": 2, "motivo": "roteador"}]}))
+    claude_falso.responder(_ok({"escolhas": [
+        {"id": "seg_01", "candidato": 2, "motivo": "roteador"},
+        {"id": "seg_02", "candidato": 0, "motivo": "texto na tela", "nova_cena": "a router alone"}]}))
     itens = _itens_curadoria(ctx, n=3)
-    assert visuais.escolher_com_claude(ctx)(itens) == {"seg_01": (2, "roteador")}
+    assert visuais.escolher_com_claude(ctx)(itens) == {
+        "seg_01": (2, "roteador", ""), "seg_02": (0, "texto na tela", "a router alone")}
     argv = claude_falso.chamadas()[-1]
     assert argv[argv.index("--model") + 1] == "sonnet"
     assert argv[argv.index("--allowedTools") + 1:] == ["Read"]

@@ -32,6 +32,7 @@ CURADORIA = {
                     "id": {"type": "string"},
                     "candidato": {"type": "integer", "minimum": 0},
                     "motivo": {"type": "string"},
+                    "nova_cena": {"type": "string"},
                 },
             },
         },
@@ -48,9 +49,9 @@ def _itens_md(itens: list[ItemCuradoria]) -> str:
 
 
 def escolher_com_claude(ctx: Contexto) -> Escolher:
-    """Uma chamada do Claude por lote: devolve `{id: (candidato, motivo)}`."""
+    """Uma chamada do Claude por lote: devolve `{id: (candidato, motivo, nova_cena)}`."""
 
-    def escolher(itens: list[ItemCuradoria]) -> dict[str, tuple[int, str]]:
+    def escolher(itens: list[ItemCuradoria]) -> dict[str, tuple[int, str, str]]:
         prompt = carregar_prompt("curadoria", estilo=ctx.canal.estilo_visual, itens=_itens_md(itens))
         try:
             r = claude.chamar(
@@ -69,7 +70,8 @@ def escolher_com_claude(ctx: Contexto) -> Escolher:
             # sem curadoria não há garantia de que o visual combina com a fala
             raise ErroEtapa(f"curadoria dos visuais falhou: {e}") from e
         claude.registrar(ctx.con, ctx.job.id, "visuais", r)
-        return {e["id"]: (int(e["candidato"]), e["motivo"]) for e in r.dados["escolhas"]}
+        return {e["id"]: (int(e["candidato"]), e["motivo"], e.get("nova_cena", ""))
+                for e in r.dados["escolhas"]}
 
     return escolher
 

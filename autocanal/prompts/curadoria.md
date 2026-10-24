@@ -18,4 +18,4 @@ Para cada trecho abaixo há uma folha de contato com até 6 candidatos numerados
 
 ## Formato da resposta
 
-`escolhas`: uma entrada por trecho, com `id` (exatamente como acima), `candidato` (o número na folha, ou 0) e `motivo` (uma frase curta dizendo o que o candidato mostra e por que combina, ou por que nenhum serve).
+`escolhas`: uma entrada por trecho, com `id` (exatamente como acima), `candidato` (o número na folha, ou 0) e `motivo` (uma frase curta dizendo o que o candidato mostra e por que combina, ou por que nenhum serve). Quando responder 0, inclua também `nova_cena`: de 15 a 40 palavras **em inglês** descrevendo uma cena mais simples que um gerador de imagens consiga fazer bem e que ainda ilustre a fala. Um assunto principal; nada de tela com conteúdo (aparelho de costas, ou tela apagada); evite mãos fazendo ações delicadas; sem texto, marcas ou pessoas famosas.

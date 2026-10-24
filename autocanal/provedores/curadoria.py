@@ -34,7 +34,9 @@ class ItemCuradoria:
     n: int
 
 
-Escolher = Callable[[list[ItemCuradoria]], dict[str, tuple[int, str]]]
+# {id: (candidato, motivo[, nova_cena])}: candidato 0 = nenhum; `nova_cena` (opcional) é uma
+# cena mais simples que o Claude sugere para o gerador quando recusa todos
+Escolher = Callable[[list[ItemCuradoria]], dict[str, tuple]]
 
 
 class CuradoriaPixabay:
@@ -74,7 +76,7 @@ class CuradoriaPixabay:
                 candidatos[p.id] = cs
                 itens.append(ItemCuradoria(p.id, p.texto, p.cena, self.pasta / f"{p.id}.jpg",
                                            len(cs)))
-        escolhas: dict[str, tuple[int, str]] = {}
+        escolhas: dict[str, tuple] = {}
         for i in range(0, len(itens), LOTE):
             escolhas.update(self.escolher(itens[i:i + LOTE]))
 
@@ -82,7 +84,7 @@ class CuradoriaPixabay:
         usadas: set[str] = set()
         obtidas: dict[str, MidiaObtida] = {}
         for item in itens:
-            indice, motivo = escolhas.get(item.id, (0, ""))
+            indice, motivo = escolhas.get(item.id, (0, ""))[:2]
             if not 1 <= indice <= item.n:
                 continue  # 0 = nenhum serve; fora da faixa conta como nenhum
             c = candidatos[item.id][indice - 1]
@@ -113,18 +115,21 @@ class FluxCurado:
     def buscar_lote(
         self, pedidos: list[Pedido], orientacao: Orientacao, excluir: set[str]
     ) -> dict[str, MidiaObtida]:
-        obtidas = self._rodada(pedidos, orientacao, excluir, "v")
-        # segunda chance: cena composta demais o FLUX não acerta; o termo curto de busca vira uma
-        # cena simples, de um assunto só
-        simples = [dataclasses.replace(p, cena=p.consulta) for p in pedidos
-                   if p.id not in obtidas and p.consulta and p.consulta != p.cena]
+        obtidas, novas_cenas = self._rodada(pedidos, orientacao, excluir, "v")
+        # segunda chance: cena composta demais o FLUX não acerta; vale a cena mais simples que o
+        # Claude escreveu ao recusar as variantes, ou o termo curto de busca
+        simples = []
+        for p in pedidos:
+            cena = novas_cenas.get(p.id) or p.consulta
+            if p.id not in obtidas and cena and cena != p.cena:
+                simples.append(dataclasses.replace(p, cena=cena))
         if simples:
-            obtidas.update(self._rodada(simples, orientacao, excluir, "s"))
+            obtidas.update(self._rodada(simples, orientacao, excluir, "s")[0])
         return obtidas
 
     def _rodada(
         self, pedidos: list[Pedido], orientacao: Orientacao, excluir: set[str], marca: str
-    ) -> dict[str, MidiaObtida]:
+    ) -> tuple[dict[str, MidiaObtida], dict[str, str]]:
         self.pasta.mkdir(parents=True, exist_ok=True)
         lote = [
             dataclasses.replace(p, id=f"{p.id}_{marca}{k}",
@@ -147,18 +152,22 @@ class FluxCurado:
                                   celula=celula, colunas=self.variantes, linhas=1)
             variantes[p.id] = vs
             itens.append(ItemCuradoria(p.id, p.texto, p.cena, folha, len(vs)))
-        escolhas: dict[str, tuple[int, str]] = {}
+        escolhas: dict[str, tuple] = {}
         for i in range(0, len(itens), LOTE):
             escolhas.update(self.escolher(itens[i:i + LOTE]))
 
         destinos = {p.id: p.destino_sem_ext for p in pedidos}
         obtidas: dict[str, MidiaObtida] = {}
+        novas_cenas: dict[str, str] = {}
         for item in itens:
-            indice, motivo = escolhas.get(item.id, (0, ""))
+            escolha = escolhas.get(item.id, (0, ""))
+            indice, motivo = escolha[:2]
             if not 1 <= indice <= item.n:
+                if len(escolha) > 2 and escolha[2]:
+                    novas_cenas[item.id] = escolha[2]
                 continue
             m = variantes[item.id][indice - 1]
             destino = Path(str(destinos[item.id]) + m.caminho.suffix)
             shutil.copyfile(m.caminho, destino)
             obtidas[item.id] = dataclasses.replace(m, caminho=destino, motivo=motivo)
-        return obtidas
+        return obtidas, novas_cenas

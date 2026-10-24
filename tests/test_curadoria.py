@@ -164,7 +164,7 @@ def test_flux_curado_erro_do_gerador_propaga(tmp_path):
 def test_prompt_curadoria_recusa_defeitos_de_ia():
     texto = (Path(__file__).parents[1] / "autocanal" / "prompts" / "curadoria.md").read_text(
         encoding="utf-8")
-    assert "dedos" in texto and "embaralhad" in texto
+    assert "dedos" in texto and "embaralhad" in texto and "`nova_cena`" in texto
 
 
 def test_flux_curado_segunda_chance_com_cena_simples(tmp_path):
@@ -211,3 +211,30 @@ def test_prompts_de_curadoria_e_revisao_mais_estritos():
     base = Path(__file__).parents[1] / "autocanal" / "prompts"
     assert "número ou letra legível" in (base / "curadoria.md").read_text(encoding="utf-8")
     assert "No Short não há thumbnail" in (base / "revisao.md").read_text(encoding="utf-8")
+
+
+def test_flux_curado_segunda_chance_usa_nova_cena_do_claude(tmp_path):
+    # prova real: o termo curto "removing phone case" virou selfies; o Claude, vendo as variantes,
+    # escreve uma cena que o gerador acerta
+    from autocanal.provedores.curadoria import FluxCurado
+    ger = GeradorFalso()
+    cenas = []
+
+    def gerar(pedidos, orientacao, excluir):
+        cenas.append({p.cena for p in pedidos})
+        return GeradorFalso.buscar_lote(ger, pedidos, orientacao, excluir)
+
+    ger.buscar_lote = gerar
+    rodadas = []
+
+    def escolher(itens):
+        rodadas.append(1)
+        if len(rodadas) == 1:
+            return {"seg_01": (0, "bloco preto disforme", "back of a phone in a thick silicone case")}
+        return {"seg_01": (1, "capa reconhecível", "")}
+
+    pedido = Pedido("seg_01", "removing phone case", "tire a capinha", "hands sliding a case",
+                    tmp_path / "seg_01")
+    r = FluxCurado(ger, escolher, tmp_path / "fc", variantes=2).buscar_lote([pedido], "retrato", set())
+    assert cenas == [{"hands sliding a case"}, {"back of a phone in a thick silicone case"}]
+    assert r["seg_01"].motivo == "capa reconhecível"
