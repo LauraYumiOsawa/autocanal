@@ -21,10 +21,11 @@ def _ok(dados):
     }
 
 
-def _roteiro(palavras: int = 100, n: int = 4) -> dict:
+def _roteiro(palavras: int = 100, n: int = 6) -> dict:
     por = palavras // n
     segs = [
-        {"texto": " ".join(f"palavra{s}x{i}" for i in range(por)), "visual": f"ocean view {s}"}
+        {"texto": " ".join(f"palavra{s}x{i}" for i in range(por)), "visual": f"ocean view {s}",
+         "cena": f"a calm ocean view number {s}"}
         for s in range(n)
     ]
     return {

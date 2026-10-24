@@ -45,13 +45,13 @@ def _ok(dados):
     }
 
 
-def _roteiro(palavras: int, n_segmentos: int = 4) -> dict:
+def _roteiro(palavras: int, n_segmentos: int = 6) -> dict:
     por_seg = palavras // n_segmentos
     segs = []
     for s in range(n_segmentos):
         n = por_seg if s < n_segmentos - 1 else palavras - por_seg * (n_segmentos - 1)
         segs.append({"texto": " ".join(f"palavra{s}x{i}" for i in range(n)),
-                     "visual": f"ocean view {s}"})
+                     "visual": f"ocean view {s}", "cena": f"a calm ocean view number {s}"})
     return {
         "gancho": segs[0]["texto"].split()[0], "nota_gancho": 72, "segmentos": segs,
         "fontes": [{"afirmacao": "o mar é salgado", "url": "https://exemplo.org/mar"}],
@@ -413,3 +413,55 @@ def test_visuais_usa_curadoria_com_chave(ctx, cfg, monkeypatch):
     assert [f["origem"] for f in fontes] == ["pixabay", "pixabay"]
     assert [f["motivo"] for f in fontes] == ["combina", "combina"]
     assert (ctx.pasta / "visuais" / "curadoria" / "seg_01.jpg").exists()
+
+
+def _roteiro_medio(segs_por_secao=(2, 3, 2), palavras_por_seg=25) -> dict:
+    secoes = []
+    for s, n in enumerate(segs_por_secao):
+        secoes.append({"titulo": f"Parte {s}", "segmentos": [
+            {"texto": " ".join(f"p{s}x{k}x{i}" for i in range(palavras_por_seg)),
+             "visual": f"ocean {s} {k}", "cena": f"a wide ocean scene {s} {k}"}
+            for k in range(n)]})
+    return {"gancho": "p0x0x0", "nota_gancho": 70, "secoes": secoes,
+            "fontes": [{"afirmacao": "o mar é salgado", "url": "https://exemplo.org/mar"}],
+            "resumo": "Por que o mar é salgado."}
+
+
+def test_achatar_secoes():
+    r = roteiro.achatar(_roteiro_medio())
+    assert r["secoes"] == ["Parte 0", "Parte 1", "Parte 2"]
+    assert [s["secao"] for s in r["segmentos"]] == [0, 0, 1, 1, 1, 2, 2]
+    assert set(r["segmentos"][0]) == {"texto", "visual", "cena", "secao"}
+    assert r["fontes"] and r["gancho"] == "p0x0x0" and r["resumo"]
+
+
+def test_achatar_mais_de_60_falha():
+    with pytest.raises(ErroEtapa, match="63 segmentos"):
+        roteiro.achatar(_roteiro_medio((9,) * 7))
+
+
+def test_roteiro_medio_usa_prompt_e_schema(cfg, con, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    job = fila.criar_job(con, "teste", "medio", "por que o mar é salgado", PUBLICAR)
+    c = contexto_para(cfg, con, job)
+    claude_falso.responder(_ok(_roteiro_medio((4, 4, 4), 40)))  # 480 palavras
+    roteiro.executar(c)
+    argv = claude_falso.chamadas()[-1]
+    assert "3 a 4 minutos" in argv[2]
+    assert json.loads(argv[argv.index("--json-schema") + 1]) == roteiro.ROTEIRO_MEDIO
+    r = ler_json(c, "roteiro.json")
+    assert len(r["secoes"]) == 3 and len(r["segmentos"]) == 12
+    assert r["segmentos"][4]["secao"] == 1
+
+
+def test_schema_short_exige_cena_e_ate_16():
+    segs = roteiro.ROTEIRO_SHORT["properties"]["segmentos"]
+    assert "cena" in segs["items"]["required"]
+    assert (segs["minItems"], segs["maxItems"]) == (6, 16)
+
+
+def test_prompts_pedem_uma_frase():
+    for nome in ("roteiro_short", "roteiro_medio"):
+        texto = (Path(__file__).parents[1] / "autocanal" / "prompts" / f"{nome}.md").read_text(
+            encoding="utf-8")
+        assert "uma única frase" in texto and "`cena`" in texto
