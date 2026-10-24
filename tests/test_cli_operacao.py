@@ -464,3 +464,16 @@ def test_aprovar_declara_sintetico_com_midia_do_flux(cfg, con, rodar):
     (pasta / "revisao_1.json").write_text(json.dumps({"origem": "checagens", "aprovado": False}))
     assert rodar("aprovar", j.id).exit_code == 0
     assert json.loads((pasta / "metadados.json").read_text())["sintetico"] is True
+
+
+def test_aprovacao_manual_vale_de_novo_depois_de_falha_no_envio(cfg, con, rodar):
+    # prova real: aprovado à mão na quarentena, o envio falhou (401) e o job ficou preso em falhou
+    j = _job(con, *QUARENTENA)
+    pasta = _pasta(cfg, j.id)
+    (pasta / "video.mp4").write_bytes(b"v")
+    (pasta / "metadados.json").write_text(json.dumps({"titulo": "T", "sintetico": False}))
+    assert rodar("aprovar", j.id).exit_code == 0
+    fila.mudar_estado(con, j.id, Estado.FALHOU, erro="HttpError 401 youtubeSignupRequired")
+    r = rodar("aprovar", j.id)
+    assert r.exit_code == 0, r.output
+    assert fila.obter(con, j.id).estado == Estado.APROVADO

@@ -373,12 +373,18 @@ def aprovar(ctx: typer.Context, job: str) -> None:
             typer.echo(f"{j.id} não tem video.mp4 e metadados.json; rode"
                        f" `autocanal produzir {j.id}`", err=True)
             raise typer.Exit(1)
-        if j.estado == Estado.FALHOU and not _ultima_revisao_aprovou(con, j.id):
+        manual = pasta / "aprovacao_manual.json"
+        if (j.estado == Estado.FALHOU and not _ultima_revisao_aprovou(con, j.id)
+                and not manual.is_file()):
             typer.echo(f"{j.id} não foi aprovado pela revisão; rode `autocanal revisar {j.id}`"
                        " (ou veja o vídeo e use a quarentena)", err=True)
             raise typer.Exit(1)
         _declarar_sintetico(pasta, j.tentativas_revisao)
         fila.mudar_estado(con, j.id, Estado.APROVADO)
+        if not manual.is_file():
+            # a aprovação de uma pessoa continua valendo se o envio falhar depois
+            manual.write_text(json.dumps({"aprovado_em": datetime.now(UTC).isoformat()}),
+                              encoding="utf-8")
     typer.echo(f"aprovado: {j.id} (vai ao ar em {_local(cfg, j.publish_at)} ou no próximo slot)")
 
 
