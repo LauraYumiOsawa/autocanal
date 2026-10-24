@@ -113,9 +113,22 @@ class FluxCurado:
     def buscar_lote(
         self, pedidos: list[Pedido], orientacao: Orientacao, excluir: set[str]
     ) -> dict[str, MidiaObtida]:
+        obtidas = self._rodada(pedidos, orientacao, excluir, "v")
+        # segunda chance: cena composta demais o FLUX não acerta; o termo curto de busca vira uma
+        # cena simples, de um assunto só
+        simples = [dataclasses.replace(p, cena=p.consulta) for p in pedidos
+                   if p.id not in obtidas and p.consulta and p.consulta != p.cena]
+        if simples:
+            obtidas.update(self._rodada(simples, orientacao, excluir, "s"))
+        return obtidas
+
+    def _rodada(
+        self, pedidos: list[Pedido], orientacao: Orientacao, excluir: set[str], marca: str
+    ) -> dict[str, MidiaObtida]:
         self.pasta.mkdir(parents=True, exist_ok=True)
         lote = [
-            dataclasses.replace(p, id=f"{p.id}_v{k}", destino_sem_ext=self.pasta / f"{p.id}_v{k}")
+            dataclasses.replace(p, id=f"{p.id}_{marca}{k}",
+                                destino_sem_ext=self.pasta / f"{p.id}_{marca}{k}")
             for p in pedidos
             for k in range(1, self.variantes + 1)
         ]
@@ -123,12 +136,12 @@ class FluxCurado:
         variantes: dict[str, list[MidiaObtida]] = {}
         itens: list[ItemCuradoria] = []
         for p in pedidos:
-            vs = [geradas[f"{p.id}_v{k}"] for k in range(1, self.variantes + 1)
-                  if f"{p.id}_v{k}" in geradas]
+            vs = [geradas[f"{p.id}_{marca}{k}"] for k in range(1, self.variantes + 1)
+                  if f"{p.id}_{marca}{k}" in geradas]
             if not vs:
                 continue
             folha = folha_contato([m.caminho for m in vs], ["imagem"] * len(vs),
-                                  self.pasta / f"{p.id}.jpg")
+                                  self.pasta / f"{p.id}{'' if marca == 'v' else '_simples'}.jpg")
             variantes[p.id] = vs
             itens.append(ItemCuradoria(p.id, p.texto, p.cena, folha, len(vs)))
         escolhas: dict[str, tuple[int, str]] = {}

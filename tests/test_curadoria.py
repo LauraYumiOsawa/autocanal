@@ -132,8 +132,9 @@ def test_flux_curado_gera_variantes_e_escolhe(tmp_path):
 
     cur = FluxCurado(ger, escolher, tmp_path / "flux_curadoria", variantes=3)
     r = cur.buscar_lote(_pedidos(tmp_path, ["a", "b"]), "retrato", set())
-    assert ger.lotes == [["seg_01_v1", "seg_01_v2", "seg_01_v3", "seg_02_v1", "seg_02_v2", "seg_02_v3"]]
-    assert escolhidos == [("seg_01", 3), ("seg_02", 3)]
+    assert ger.lotes == [["seg_01_v1", "seg_01_v2", "seg_01_v3", "seg_02_v1", "seg_02_v2", "seg_02_v3"],
+                         ["seg_02_s1", "seg_02_s2", "seg_02_s3"]]  # 2ª chance só para o reprovado
+    assert escolhidos == [("seg_01", 3), ("seg_02", 3), ("seg_02", 3)]
     assert list(r) == ["seg_01"]
     m = r["seg_01"]
     assert m.caminho == tmp_path / "seg_01.png" and m.caminho.is_file()
@@ -164,3 +165,33 @@ def test_prompt_curadoria_recusa_defeitos_de_ia():
     texto = (Path(__file__).parents[1] / "autocanal" / "prompts" / "curadoria.md").read_text(
         encoding="utf-8")
     assert "dedos" in texto and "embaralhad" in texto
+
+
+def test_flux_curado_segunda_chance_com_cena_simples(tmp_path):
+    # prova real: cenas com 5 objetos (mão, celular, cabo, carregador, tomada) o FLUX não acerta;
+    # o termo curto de busca vira uma cena simples, que ele desenha bem
+    from autocanal.provedores.curadoria import FluxCurado
+    ger = GeradorFalso()
+    recebidos = []
+
+    def gerar(pedidos, orientacao, excluir):
+        recebidos.append([(p.id, p.cena) for p in pedidos])
+        return GeradorFalso.buscar_lote(ger, pedidos, orientacao, excluir)
+
+    ger.buscar_lote = gerar
+    chamadas = []
+
+    def escolher(itens):
+        chamadas.append([i.id for i in itens])
+        rodada = len(chamadas)
+        return {i.id: ((0, "dedos a mais") if rodada == 1 and i.id == "seg_01" else (1, "ok"))
+                for i in itens}
+
+    pedidos = [Pedido("seg_01", "fast charger phone", "fala 1", "a hand, a phone, a cable and a socket",
+                      tmp_path / "seg_01"),
+               Pedido("seg_02", "shower", "fala 2", "an electric shower", tmp_path / "seg_02")]
+    r = FluxCurado(ger, escolher, tmp_path / "fc", variantes=2).buscar_lote(pedidos, "retrato", set())
+    assert sorted(r) == ["seg_01", "seg_02"]
+    assert recebidos[1] == [("seg_01_s1", "fast charger phone"), ("seg_01_s2", "fast charger phone")]
+    assert chamadas == [["seg_01", "seg_02"], ["seg_01"]]
+    assert r["seg_01"].url == "flux:seg_01_s1"
