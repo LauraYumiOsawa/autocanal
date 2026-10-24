@@ -8,9 +8,15 @@ conteudo:
   fonte_arquivo: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
   fonte_nome: DejaVu Sans
   perfil_voz: config/vozes/exemplo.md
+  # opcionais (padrões entre parênteses):
+  feito_para_criancas: false  # (false) marca o upload como conteúdo infantil
+  visuais: [pixabay, flux]  # ([pixabay]) fontes na ordem; o procedural só existe para emergência
+  estilo_visual: realista  # (realista) ou desenho: vale para o Pixabay e para o FLUX
+  estilo_ia: ""  # ("") texto extra no prompt do FLUX, em inglês (ex.: "warm cinematic tones")
   grade:
     - {formato: short, dias: [seg, qua, sex, dom], hora: "12:00"}
     - {formato: short, dias: [ter, qui, sab], hora: "19:00"}
+    - {formato: medio, dias: [ter, qui], hora: "18:00"}
 musica:
   nome: Música
   nicho: ""
