@@ -8,9 +8,12 @@ conteudo:
   fonte_arquivo: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
   fonte_nome: DejaVu Sans
   perfil_voz: config/vozes/exemplo.md
+  visuais: [pixabay, flux]  # curadoria do Pixabay; o que não combinar com a fala, o FLUX gera
+  estilo_visual: realista
   grade:
     - {formato: short, dias: [seg, qua, sex, dom], hora: "12:00"}
     - {formato: short, dias: [ter, qui, sab], hora: "19:00"}
+    - {formato: medio, dias: [ter, qui], hora: "18:00"}
 musica:
   nome: Música
   nicho: "Video Clipes e meme"
@@ -43,7 +46,10 @@ infantil:
   fonte_arquivo: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
   fonte_nome: DejaVu Sans
   perfil_voz: config/vozes/infantil.md
-  grade: []  # desligada até o upload marcar madeForKids=true e o formato medio existir
+  feito_para_criancas: true
+  visuais: [pixabay, flux]
+  estilo_visual: desenho
+  grade: []  # desligada até Laura decidir ligar (upload já marca madeForKids e o médio existe)
   # grade prevista (shorts diários + médios de até 5 min):
   #   - {formato: short, dias: [seg, ter, qua, qui, sex, sab, dom], hora: "10:00"}
   #   - {formato: medio, dias: [qua, sab], hora: "09:00"}

@@ -442,3 +442,38 @@ def test_diagnostico_lista_chaves_sem_pexels(rodar, monkeypatch):
     r = rodar("diagnostico")
     assert "PIXABAY_API_KEY" in r.output and "GOOGLE_TTS_API_KEY" in r.output
     assert "PEXELS" not in r.output
+
+
+def test_diagnostico_mostra_flux(rodar, monkeypatch, cfg):
+    monkeypatch.setattr(cli, "_executa", lambda cmd: (True, "ok"))
+    assert "[FALHA] flux: não instalado (opcional)" in rodar("diagnostico").output
+    cfg.flux.projeto.mkdir(parents=True)
+    (cfg.flux.projeto / "pyproject.toml").write_text("[project]\n")
+    (cfg.flux.projeto / "gerar.py").write_text("")
+    (cfg.flux.projeto / ".venv" / "bin").mkdir(parents=True)
+    (cfg.flux.projeto / ".venv" / "bin" / "python").write_text("")
+    assert "[OK   ] flux" in rodar("diagnostico").output
+
+
+def test_aprovar_declara_sintetico_com_midia_do_flux(cfg, con, rodar):
+    j = _job(con, *QUARENTENA)
+    fila.atualizar(con, j.id, tentativas_revisao=2)
+    pasta = _pasta(cfg, j.id)
+    (pasta / "metadados.json").write_text(json.dumps({"titulo": "T", "sintetico": False}))
+    (pasta / "fontes_midia.json").write_text(json.dumps([{"origem": "pixabay"}, {"origem": "flux"}]))
+    (pasta / "revisao_1.json").write_text(json.dumps({"origem": "checagens", "aprovado": False}))
+    assert rodar("aprovar", j.id).exit_code == 0
+    assert json.loads((pasta / "metadados.json").read_text())["sintetico"] is True
+
+
+def test_aprovacao_manual_vale_de_novo_depois_de_falha_no_envio(cfg, con, rodar):
+    # prova real: aprovado à mão na quarentena, o envio falhou (401) e o job ficou preso em falhou
+    j = _job(con, *QUARENTENA)
+    pasta = _pasta(cfg, j.id)
+    (pasta / "video.mp4").write_bytes(b"v")
+    (pasta / "metadados.json").write_text(json.dumps({"titulo": "T", "sintetico": False}))
+    assert rodar("aprovar", j.id).exit_code == 0
+    fila.mudar_estado(con, j.id, Estado.FALHOU, erro="HttpError 401 youtubeSignupRequired")
+    r = rodar("aprovar", j.id)
+    assert r.exit_code == 0, r.output
+    assert fila.obter(con, j.id).estado == Estado.APROVADO

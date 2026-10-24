@@ -12,6 +12,8 @@ from autocanal.legendas import (
     cor_ass,
     escapar_ass,
     gerar_ass,
+    largura_util,
+    medidor,
     transcrever,
 )
 from autocanal.provedores.tts import criar_tts
@@ -140,3 +142,33 @@ def test_transcrever_kokoro(cfg, tmp_path):
     esperadas = {"céu", "azul", "mar", "muito", "grande", "hoje", "o", "é", "e"}
     obtidas = {p.texto.lower().strip(".,!?") for p in palavras}
     assert len(esperadas & obtidas) / len(esperadas) >= 0.5
+
+
+FONTE_NEGRITO = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+
+
+def test_agrupar_sem_medidor_igual_antes():
+    g = agrupar(_palavras(["a", "b", "c", "d", "e", "f", "g"]))
+    assert [x.texto for x in g] == ["a b c", "d e f", "g"]
+
+
+def test_agrupar_fecha_por_largura():
+    g = agrupar(_palavras(["velocidade", "num", "computador"]),
+                largura_max=600, medir=lambda t: 40 * len(t))
+    assert [x.texto for x in g] == ["velocidade num", "computador"]
+
+
+def test_agrupar_palavra_sozinha_larga():
+    g = agrupar(_palavras(["velocidade", "num", "computador"]),
+                largura_max=600, medir=lambda t: 10_000)
+    assert [x.texto for x in g] == ["velocidade", "num", "computador"]
+
+
+def test_largura_util_desconta_margens_e_contorno():
+    assert largura_util(1080) == 1080 - 2 * 60 - 2 * 6
+
+
+def test_medidor_cresce_com_o_texto():
+    medir = medidor(FONTE_NEGRITO, 88)
+    assert 0 < medir("ABC") < medir("ABCDEF")
+

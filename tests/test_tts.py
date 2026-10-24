@@ -221,3 +221,14 @@ def test_kokoro_gerenciado_com_docker_ausente_usa_reserva(cfg, tmp_path, monkeyp
     tts.sintetizar("oi", tmp_path / "a.wav")
     assert tts.usou_reserva is True
     assert tts.nome == "falso"
+
+
+def test_kokoro_gerenciado_espera_o_tempo_configurado(cfg, tmp_path, monkeypatch):
+    # prova real de 2026-10-24: o contêiner levou 241 s para responder e o limite era 180 s
+    from autocanal.provedores import tts as mod_tts
+    recebido = {}
+    monkeypatch.setattr(mod_tts.servicos, "garantir", lambda *a, **k: recebido.update(k))
+    monkeypatch.setattr(mod_tts.KokoroTTS, "sintetizar", lambda self, texto, destino: destino)
+    assert cfg.kokoro_timeout_s == 600
+    mod_tts._KokoroGerenciado(cfg, "pf_dora").sintetizar("oi", tmp_path / "a.wav")
+    assert recebido == {"timeout_s": 600}

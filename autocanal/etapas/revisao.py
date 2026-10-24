@@ -4,8 +4,12 @@ from __future__ import annotations
 import json
 import re
 from datetime import UTC, datetime
+from pathlib import Path
+
+from PIL import Image
 
 from autocanal import claude, fila
+from autocanal.etapas.metadados import AVISOS_IA
 from autocanal.etapas.base import (
     PROBLEMAS_REVISAO,
     Contexto,
@@ -40,10 +44,13 @@ REVISAO = {
         "problemas": {"type": "array", "items": {"type": "string"}},
         "etapa_para_refazer": {
             "type": ["string", "null"],
-            "enum": ["roteiro", "narracao", "legendas", "visuais", "render", "metadados", None],
+            "enum": ["roteiro", "narracao", "legendas", "visuais", "render", "metadados",
+                     "thumbnail", None],
         },
         "refazer_metadados": {"type": "boolean"},
         "contains_synthetic_media": {"type": "boolean"},
+        # segmentos (1 = primeiro) cujo visual deve ser refeito; os outros são mantidos
+        "trechos_visuais": {"type": "array", "items": {"type": "integer", "minimum": 1}},
     },
 }
 
@@ -116,6 +123,18 @@ def _checar_video(ctx: Contexto) -> list[tuple[str, str]]:
     return problemas
 
 
+def _checar_thumbnail(arq: Path) -> list[tuple[str, str]]:
+    if not arq.exists():
+        return [("thumbnail ausente (thumbnail.jpg)", "thumbnail")]
+    with Image.open(arq) as im:
+        tamanho = im.size
+    if tamanho != (1280, 720):
+        return [(f"thumbnail com {tamanho[0]}×{tamanho[1]} (esperado 1280×720)", "thumbnail")]
+    if arq.stat().st_size >= 2_000_000:
+        return [(f"thumbnail com {arq.stat().st_size} bytes (máximo 2 MB)", "thumbnail")]
+    return []
+
+
 def checagens(ctx: Contexto) -> list[tuple[str, str]]:
     """Problemas determinísticos, cada um com a etapa que o resolve."""
     rev = ctx.cfg.revisao
@@ -152,6 +171,19 @@ def checagens(ctx: Contexto) -> list[tuple[str, str]]:
             f"mídia sem origem ou licença registrada nos segmentos {', '.join(sem_registro)}",
             "visuais",
         ))
+    for i, f in enumerate(fontes, 1):
+        if f.get("origem") == "procedural":
+            problemas.append((f"trecho {i} sem imagem relacionada à fala (fundo procedural)",
+                              "visuais"))
+    if any(f.get("origem") == "flux" for f in fontes) and (
+        not any(a in meta.get("descricao_final", "") for a in AVISOS_IA)
+        or not meta.get("sintetico")
+    ):
+        problemas.append(("descrição ou marcação sem o aviso de imagens geradas por IA",
+                          "metadados"))
+
+    if "thumbnail" in ctx.formato.etapas:
+        problemas.extend(_checar_thumbnail(ctx.pasta / "thumbnail.jpg"))
 
     texto = _texto_roteiro(roteiro)
     maior, parecido = max(
@@ -231,7 +263,8 @@ def executar(ctx: Contexto) -> None:
     ctx.con.commit()
     if aprovado:
         meta = ler_json(ctx, "metadados.json")
-        meta["sintetico"] = resultado["contains_synthetic_media"]
+        # a revisão pode ligar a marcação de mídia sintética, nunca desligar (ex.: imagens do FLUX)
+        meta["sintetico"] = bool(meta.get("sintetico")) or resultado["contains_synthetic_media"]
         gravar_json(ctx, "metadados.json", meta)
         novo = Estado.APROVADO
     elif rodada >= ctx.cfg.revisao.max_rodadas:

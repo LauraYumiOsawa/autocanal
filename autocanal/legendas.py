@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 import difflib
+import gc
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+
+from PIL import ImageFont
 
 _MODELOS: dict[tuple[str, str, str], object] = {}
 _FINAIS = (".", "!", "?")
@@ -34,6 +38,12 @@ def _modelo(modelo: str, dispositivo: str, compute_type: str):
             modelo, device=dispositivo, compute_type=compute_type
         )
     return _MODELOS[chave]
+
+
+def liberar_modelos() -> None:
+    """Solta os modelos do Whisper em cache (libera a placa antes do FLUX)."""
+    _MODELOS.clear()
+    gc.collect()
 
 
 def transcrever(
@@ -120,9 +130,30 @@ def alinhar(texto: str, transcritas: list[Palavra]) -> list[Palavra]:
     return saida
 
 
+MARGEM_LATERAL = 60
+CONTORNO = 6
+
+
+def largura_util(largura: int) -> int:
+    """Largura em que a legenda cabe: o quadro menos as margens e o contorno dos dois lados."""
+    return largura - 2 * MARGEM_LATERAL - 2 * CONTORNO
+
+
+def medidor(fonte_arquivo: Path, tamanho: int) -> Callable[[str], float]:
+    fonte = ImageFont.truetype(str(fonte_arquivo), tamanho)
+    return fonte.getlength
+
+
 def agrupar(
-    palavras: list[Palavra], max_palavras: int = 3, max_duracao_s: float = 1.6
+    palavras: list[Palavra],
+    max_palavras: int = 3,
+    max_duracao_s: float = 1.6,
+    *,
+    largura_max: float | None = None,
+    medir: Callable[[str], float] | None = None,
 ) -> list[Legenda]:
+    """Blocos de legenda; com `medir`, fecha o bloco antes de passar de `largura_max`
+    (o texto vai em caixa alta, com `WrapStyle: 2` o libass não quebra a linha)."""
     legendas: list[Legenda] = []
     grupo: list[Palavra] = []
 
@@ -133,8 +164,14 @@ def agrupar(
             )
             grupo.clear()
 
+    def largo_demais(p: Palavra) -> bool:
+        if medir is None or largura_max is None:
+            return False
+        texto = " ".join(x.texto for x in [*grupo, p]).upper()
+        return medir(texto) > largura_max
+
     for p in palavras:
-        if grupo and p.fim - grupo[0].inicio > max_duracao_s:
+        if grupo and (p.fim - grupo[0].inicio > max_duracao_s or largo_demais(p)):
             fechar()
         grupo.append(p)
         if len(grupo) >= max_palavras or p.texto.endswith(_FINAIS):
@@ -177,7 +214,7 @@ def gerar_ass(
     estilo = (
         f"Style: Legenda,{fonte_nome},{tamanho},{cor_ass(cor_texto)},"
         f"{cor_ass(cor_destaque)},&H00000000,&H00000000,"
-        f"-1,0,0,0,100,100,0,0,1,6,0,2,60,60,{margem_v},1"
+        f"-1,0,0,0,100,100,0,0,1,{CONTORNO},0,2,{MARGEM_LATERAL},{MARGEM_LATERAL},{margem_v},1"
     )
     linhas = [
         "[Script Info]",

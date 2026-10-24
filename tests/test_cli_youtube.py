@@ -86,3 +86,18 @@ def test_auth_verificacao_falha_remove_token(cfg, raiz_teste, monkeypatch):
     r = runner.invoke(cli.app, ["--raiz", str(raiz_teste), "auth", "teste"])
     assert r.exit_code == 1 and not token.exists() and "SEGREDO" not in r.output
     assert conectar(cfg.dados / "autocanal.db").execute("SELECT * FROM canais_estado").fetchall() == []
+
+
+def test_vetar_canal_infantil(cfg, raiz_teste, monkeypatch):
+    import yaml
+    arq = raiz_teste / "config" / "canais.yaml"
+    dados = yaml.safe_load(arq.read_text(encoding="utf-8"))
+    dados["teste"]["feito_para_criancas"] = True
+    arq.write_text(yaml.safe_dump(dados, allow_unicode=True), encoding="utf-8")
+    con, j = _agendado(cfg)
+    yt = MagicMock()
+    monkeypatch.setattr(cli.publicador, "youtube_real", lambda c: (lambda canal: yt))
+    r = runner.invoke(cli.app, ["--raiz", str(raiz_teste), "vetar", j.id])
+    assert r.exit_code == 0, r.output
+    corpo = yt.videos.return_value.update.call_args.kwargs["body"]
+    assert corpo["status"]["selfDeclaredMadeForKids"] is True

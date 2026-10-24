@@ -118,6 +118,16 @@ def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
             avisos.append(f"Job `{job.id}` só com visuais procedurais (nenhum banco de imagens"
                           " respondeu): confira PIXABAY_API_KEY em"
                           " config/segredos.env e o log.")
+    for job in fila.listar(con, {Estado.AGENDADO, Estado.PUBLICADO}):
+        try:
+            envio = json.loads(
+                (cfg.dados / "jobs" / job.id / "thumbnail_envio.json").read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            continue
+        if not envio.get("ok", True):
+            avisos.append(f"Miniatura de `{job.id}` não foi enviada: verifique o telefone do canal"
+                          " em youtube.com/verify.")
     sistema = produtor.pausa_sistema(cfg)
     if sistema is not None and agora < sistema[0]:
         avisos.append(f"Produção pausada até {_hora(cfg, sistema[0])} por queda geral"

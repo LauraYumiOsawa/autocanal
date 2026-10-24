@@ -186,6 +186,18 @@ def _midia_faltando(ctx, cfg, con, videos):
     gravar_json(ctx, "fontes_midia.json", ler_json(ctx, "fontes_midia.json")[:3])
 
 
+def _midia_procedural(ctx, cfg, con, videos):
+    fontes = ler_json(ctx, "fontes_midia.json")
+    fontes[1].update(origem="procedural", licenca="gerado localmente", url="procedural:abc")
+    gravar_json(ctx, "fontes_midia.json", fontes)
+
+
+def _flux_sem_aviso(ctx, cfg, con, videos):
+    fontes = ler_json(ctx, "fontes_midia.json")
+    fontes[0].update(origem="flux", licenca="gerado localmente (FLUX.2 klein 4B, Apache 2.0)")
+    gravar_json(ctx, "fontes_midia.json", fontes)
+
+
 def _roteiro_repetido(ctx, cfg, con, videos):
     _outro_job(cfg, con, "teste", _roteiro())
 
@@ -198,6 +210,8 @@ def _roteiro_repetido(ctx, cfg, con, videos):
     (_titulo_fraco, "nota 62", ["metadados"]),
     (_midia_sem_licenca, "licença", ["visuais"]),
     (_midia_faltando, "3 mídias para 4 segmentos", ["visuais"]),
+    (_midia_procedural, "trecho 2 sem imagem relacionada à fala", ["visuais"]),
+    (_flux_sem_aviso, "aviso de imagens geradas por IA", ["metadados"]),
     (_roteiro_repetido, "parecido", ["roteiro"]),
 ])
 def test_checagens_mapeiam_etapa(ctx, cfg, con, videos, mudar, trecho, etapas_esperadas):
@@ -375,3 +389,49 @@ def test_revisor_pede_metadados_junto_com_visuais(ctx, cfg, con, claude_falso):
     assert [fila.estado_etapa(con, j.id, n) for n in ETAPAS] == [
         "ok", "ok", "ok", None, None, None, None]
     assert ler_json(ctx, "revisao_1.json")["refazer_metadados"] is True
+
+
+def test_revisao_nao_desliga_sintetico(ctx, cfg, con, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    meta = ler_json(ctx, "metadados.json")
+    gravar_json(ctx, "metadados.json", {**meta, "sintetico": True})  # mídia do FLUX
+    claude_falso.responder(_parecer(True, sintetico=False))
+    revisao.executar(ctx)
+    assert ler_json(ctx, "metadados.json")["sintetico"] is True
+
+
+@pytest.mark.parametrize("tamanho, esperado", [((640, 360), "640×360"), (None, "ausente")])
+def test_revisao_reprova_thumbnail_errada(ctx, tamanho, esperado):
+    import dataclasses
+
+    from PIL import Image
+
+    from autocanal.formatos import FORMATOS
+    medio = dataclasses.replace(ctx, formato=FORMATOS["medio"])
+    if tamanho:
+        Image.new("RGB", tamanho).save(medio.pasta / "thumbnail.jpg")
+    problemas = [(p, e) for p, e in revisao.checagens(medio) if e == "thumbnail"]
+    assert len(problemas) == 1 and esperado in problemas[0][0]
+
+
+def test_revisao_thumbnail_certa_sem_problema(ctx):
+    import dataclasses
+
+    from PIL import Image
+
+    from autocanal.formatos import FORMATOS
+    medio = dataclasses.replace(ctx, formato=FORMATOS["medio"])
+    Image.new("RGB", (1280, 720)).save(medio.pasta / "thumbnail.jpg")
+    assert [e for _, e in revisao.checagens(medio) if e == "thumbnail"] == []
+
+
+def test_schema_revisor_aceita_thumbnail():
+    assert "thumbnail" in revisao.REVISAO["properties"]["etapa_para_refazer"]["enum"]
+
+
+def test_schema_revisor_tem_trechos_visuais():
+    campo = revisao.REVISAO["properties"]["trechos_visuais"]
+    assert campo["type"] == "array" and campo["items"]["minimum"] == 1
+    texto = (Path(__file__).parents[1] / "autocanal" / "prompts" / "revisao.md").read_text(
+        encoding="utf-8")
+    assert "`trechos_visuais`" in texto

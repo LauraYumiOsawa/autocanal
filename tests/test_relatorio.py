@@ -180,3 +180,12 @@ def test_notificar_chama_notify_send_e_engole_erros(monkeypatch):
     monkeypatch.setattr(relatorio.subprocess, "run", run)
     relatorio.notificar("título", "texto")
     assert chamadas == [["/usr/bin/notify-send", "título", "texto"]]
+
+
+def test_alerta_thumbnail_nao_enviada(cfg, con):
+    j = _job(cfg, con, Estado.AGENDADO, datetime(2026, 10, 29, 15, tzinfo=UTC), video="abc")
+    pasta = cfg.dados / "jobs" / j.id
+    pasta.mkdir(parents=True, exist_ok=True)
+    (pasta / "thumbnail_envio.json").write_text(json.dumps({"ok": False, "erro": "forbidden"}))
+    avisos = relatorio.alertas(cfg, con, datetime(2026, 10, 26, 12, tzinfo=UTC))
+    assert any(j.id in a and "youtube.com/verify" in a for a in avisos)

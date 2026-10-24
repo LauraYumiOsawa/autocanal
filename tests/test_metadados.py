@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from pathlib import Path
 from datetime import UTC, datetime
 
 import pytest
@@ -40,6 +41,7 @@ def _metadados(**extra) -> dict:
     return {
         "titulo": "Por que o mar é salgado? 3 motivos",
         "texto_thumb": "SAL ESCONDIDO",
+        "cena_thumb": "salt crystals glowing on a dark rock by the sea",
         "descricao": "O sal do mar vem das rochas <de verdade>.",
         "tags": ["mar", "Mar", "", "oceano"],
         "consultas_alvo": ["por que o mar é salgado", "sal do mar", "oceano salgado"],
@@ -116,6 +118,8 @@ def test_metadados_grava_json(ctx, cfg, claude_falso):
     assert m == {
         "titulo": "Por que o mar é salgado? 3 motivos",
         "texto_thumb": "SAL ESCONDIDO",
+        "cena_thumb": "salt crystals glowing on a dark rock by the sea",
+        "descricao": "O sal do mar vem das rochas ‹de verdade›.",
         "descricao_final": (
             "O sal do mar vem das rochas ‹de verdade›.\n\nFontes:\n"
             f"{URLS[0]}\n{URLS[1]}\n\n#shorts"
@@ -170,3 +174,83 @@ def test_metadados_limites_do_youtube(ctx, cfg, claude_falso, extra, erro):
 
 def test_registro_tem_metadados():
     assert etapas.REGISTRO["metadados"] is metadados.executar
+
+
+def _rot_nar(inicios, duracao):
+    """Roteiro com uma seção por início (2 segmentos cada) e a narração correspondente."""
+    segs, tempos = [], []
+    for i, t in enumerate(inicios):
+        for k in range(2):
+            segs.append({"texto": "x", "visual": "v", "cena": "c", "secao": i})
+            tempos.append({"arquivo": "a.wav", "inicio": t + k, "fim": t + k + 0.9})
+    return ({"secoes": [f"S{i}" for i in range(len(inicios))], "segmentos": segs},
+            {"segmentos": tempos, "duracao": duracao})
+
+
+def test_capitulos_basico():
+    caps = metadados.capitulos_calculados(*_rot_nar([0, 40, 95], 150))
+    assert caps == [{"tempo": 0, "titulo": "S0"}, {"tempo": 40, "titulo": "S1"},
+                    {"tempo": 95, "titulo": "S2"}]
+
+
+def test_capitulos_funde_curta_do_meio():
+    caps = metadados.capitulos_calculados(*_rot_nar([0, 40, 45, 100], 160))
+    assert [(c["tempo"], c["titulo"]) for c in caps] == [(0, "S0"), (45, "S2"), (100, "S3")]
+
+
+def test_capitulos_funde_primeira_curta():
+    caps = metadados.capitulos_calculados(*_rot_nar([0, 6, 60, 120], 180))
+    assert [(c["tempo"], c["titulo"]) for c in caps] == [(0, "S1"), (60, "S2"), (120, "S3")]
+
+
+def test_capitulos_menos_de_3_vazio():
+    assert metadados.capitulos_calculados(*_rot_nar([0, 50], 100)) == []
+
+
+@pytest.mark.parametrize("origens, esperado", [
+    (["pixabay", "procedural"], "Imagens: Pixabay"),
+    (["flux"], "As imagens deste vídeo foram geradas por IA."),
+    (["flux", "pixabay"], "Imagens: Pixabay\nAlgumas imagens deste vídeo foram geradas por IA."),
+    # prova real: 9 de 11 do FLUX e o aviso "Algumas" contradizia o revisor
+    (["flux", "flux", "pixabay"], "Imagens: Pixabay\nA maioria das imagens deste vídeo foi gerada por IA."),
+    (["procedural"], ""),
+])
+def test_creditos(origens, esperado):
+    assert metadados.creditos([{"origem": o} for o in origens]) == esperado
+
+
+def test_descricao_creditos_antes_de_fontes():
+    d = metadados.descricao_final("Resumo.", [], [URLS[0]], "medio", "Imagens: Pixabay")
+    assert d == f"Resumo.\n\nImagens: Pixabay\n\nFontes:\n{URLS[0]}"
+
+
+def test_metadados_medio_calcula_capitulos_e_sintetico(cfg, con, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    job = fila.criar_job(con, "teste", "medio", "por que o mar é salgado", PUBLICAR)
+    c = contexto_para(cfg, con, job)
+    roteiro, narracao = _rot_nar([0, 40, 95], 150)
+    gravar_json(c, "roteiro.json", {**roteiro, "fontes": [{"afirmacao": "a", "url": URLS[0]}]})
+    gravar_json(c, "narracao.json", narracao)
+    gravar_json(c, "fontes_midia.json", [{"origem": "flux"}, {"origem": "pixabay"}])
+    claude_falso.responder(_ok(_metadados(capitulos=[{"tempo": 3, "titulo": "do Claude"}])))
+    metadados.executar(c)
+    m = ler_json(c, "metadados.json")
+    assert [(x["tempo"], x["titulo"]) for x in m["capitulos"]] == [(0, "S0"), (40, "S1"), (95, "S2")]
+    assert m["sintetico"] is True
+    assert m["cena_thumb"] == "salt crystals glowing on a dark rock by the sea"
+    assert "00:40 S1" in m["descricao_final"]
+    assert "Imagens: Pixabay\nAlgumas imagens deste vídeo foram geradas por IA." in m["descricao_final"]
+    assert not m["descricao_final"].endswith("#shorts")
+
+
+def test_metadados_guarda_descricao_base(ctx, cfg, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    gravar_json(ctx, "roteiro.json", {"segmentos": [{"texto": "x", "visual": "v"}], "fontes": []})
+    claude_falso.responder(_ok(_metadados()))
+    metadados.executar(ctx)
+    assert ler_json(ctx, "metadados.json")["descricao"] == "O sal do mar vem das rochas ‹de verdade›."
+
+
+def test_prompt_metadados_deixa_creditos_para_o_sistema():
+    texto = (Path(metadados.__file__).parents[1] / "prompts" / "metadados.md").read_text(encoding="utf-8")
+    assert "avisos de IA" in texto

@@ -37,7 +37,7 @@ def _aprovado(cfg, con, publish_at, canal="teste", formato="short", thumb=False)
     (pasta / "video.mp4").write_bytes(b"v")
     (pasta / "metadados.json").write_text(json.dumps(META), encoding="utf-8")
     if thumb:
-        (pasta / "thumbnail.png").write_bytes(b"p")
+        (pasta / "thumbnail.jpg").write_bytes(b"p")
     return j
 
 
@@ -378,3 +378,28 @@ def test_reaprovar_apos_rejeicao_reenvia(cfg, con, monkeypatch):
     assert env.call_count == 1
     n = fila.obter(con, j.id)
     assert n.estado == Estado.AGENDADO and n.youtube_video_id == "novo"
+
+
+def test_publicar_repassa_feito_para_criancas(cfg, con, envios):
+    cfg.canais["teste"].feito_para_criancas = True
+    _aprovado(cfg, con, AGORA + timedelta(days=2))
+    _pub(cfg, con, lambda c: MagicMock())
+    assert envios[0][2]["status"]["selfDeclaredMadeForKids"] is True
+
+
+def test_publicar_envia_thumbnail_jpg(cfg, con, envios):
+    j = _aprovado(cfg, con, AGORA + timedelta(days=2), formato="medio", thumb=True)
+    _pub(cfg, con, lambda c: MagicMock())
+    [chamada] = publicador.upload.definir_thumbnail.call_args_list
+    assert chamada.args[2] == cfg.dados / "jobs" / j.id / "thumbnail.jpg"
+    envio = json.loads((cfg.dados / "jobs" / j.id / "thumbnail_envio.json").read_text())
+    assert envio == {"ok": True, "erro": ""}
+
+
+def test_thumbnail_recusada_grava_envio(cfg, con, envios):
+    publicador.upload.definir_thumbnail.side_effect = upload.ErroUpload("forbidden: " + "x" * 300)
+    j = _aprovado(cfg, con, AGORA + timedelta(days=2), formato="medio", thumb=True)
+    _pub(cfg, con, lambda c: MagicMock())
+    assert fila.obter(con, j.id).estado == Estado.AGENDADO
+    envio = json.loads((cfg.dados / "jobs" / j.id / "thumbnail_envio.json").read_text())
+    assert envio["ok"] is False and envio["erro"].startswith("forbidden") and len(envio["erro"]) == 200

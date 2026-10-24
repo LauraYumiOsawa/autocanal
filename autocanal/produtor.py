@@ -75,13 +75,7 @@ def pausa_sistema(cfg: Config) -> tuple[datetime, str] | None:
 
 
 def _parar_kokoro(cfg: Config) -> None:
-    """Para o contêiner do Kokoro (se o projeto o tiver); erros só viram aviso."""
-    if not (cfg.raiz / "servicos" / "kokoro" / "docker-compose.yml").exists():
-        return
-    try:
-        servicos.parar("kokoro", cfg.raiz)
-    except Exception as e:  # noqa: BLE001 - parar é cortesia: nunca derruba a produção
-        log.warning("não consegui parar o Kokoro: %s", type(e).__name__)
+    servicos.parar_kokoro(cfg.raiz)
 
 
 def produzir(
