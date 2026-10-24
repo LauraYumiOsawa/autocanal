@@ -60,6 +60,11 @@ class Canal(BaseModel):
     fonte_nome: str
     perfil_voz: Path
     grade: list[Slot]
+    feito_para_criancas: bool = False
+    # fontes dos visuais, na ordem; o fundo procedural é sempre a última (e reprovado na revisão)
+    visuais: list[Literal["pixabay", "flux"]] = ["pixabay"]
+    estilo_visual: Literal["realista", "desenho"] = "realista"
+    estilo_ia: str = ""
 
 
 class ConfigClaude(BaseModel):

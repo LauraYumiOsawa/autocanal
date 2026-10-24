@@ -164,7 +164,9 @@ def vetar(ctx: typer.Context, job: str) -> None:
     except (OSError, ValueError):
         sintetico = False
     try:
-        upload.vetar(publicador.youtube_real(cfg)(j.canal), j.youtube_video_id, sintetico)
+        canal = cfg.canais.get(j.canal)
+        infantil = canal.feito_para_criancas if canal is not None else False
+        upload.vetar(publicador.youtube_real(cfg)(j.canal), j.youtube_video_id, sintetico, infantil)
     except (oauth.AuthExpirada, upload.CotaEsgotada, upload.ErroUpload) as e:
         typer.echo(f"falha ao vetar no YouTube: {e}", err=True)
         raise typer.Exit(1)

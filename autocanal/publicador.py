@@ -135,6 +135,7 @@ def publicar_aprovados(
             corpo = upload.montar_corpo(
                 meta, publish_at=job.publish_at, categoria_id=canal.categoria_id,
                 idioma=canal.idioma, sintetico=bool(meta.get("sintetico")),
+                feito_para_criancas=canal.feito_para_criancas,
             )
         except (OSError, ValueError, KeyError) as e:
             fila.mudar_estado(con, job.id, Estado.FALHOU, erro=f"{type(e).__name__}: {e}")

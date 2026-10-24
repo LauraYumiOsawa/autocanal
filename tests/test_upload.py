@@ -31,7 +31,8 @@ def test_formatar_publish_at():
 def test_montar_corpo_campos():
     meta = {"titulo": "T", "descricao_final": "D", "tags": ["a"]}
     dt = datetime(2026, 10, 25, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
-    c = upload.montar_corpo(meta, publish_at=dt, categoria_id="27", idioma="pt-BR", sintetico=True)
+    c = upload.montar_corpo(meta, publish_at=dt, categoria_id="27", idioma="pt-BR", sintetico=True,
+                            feito_para_criancas=False)
     assert c["snippet"] == {
         "title": "T", "description": "D", "tags": ["a"], "categoryId": "27",
         "defaultLanguage": "pt-BR", "defaultAudioLanguage": "pt-BR",
@@ -169,3 +170,19 @@ def test_cota_carrega_motivo(tmp_path):
     with pytest.raises(upload.CotaEsgotada) as ei:
         upload.enviar(yt, tmp_path / "v", {}, dormir=MagicMock(), media_factory=MagicMock())
     assert ei.value.motivo == "uploadLimitExceeded"
+
+
+def test_montar_corpo_feito_para_criancas():
+    meta = {"titulo": "T", "descricao_final": "D", "tags": []}
+    dt = datetime(2026, 10, 25, 15, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
+    c = upload.montar_corpo(meta, publish_at=dt, categoria_id="27", idioma="pt-BR",
+                            sintetico=False, feito_para_criancas=True)
+    assert c["status"]["selfDeclaredMadeForKids"] is True
+
+
+def test_vetar_repassa_feito_para_criancas():
+    # videos.update substitui o status inteiro: o veto não pode desmarcar o conteúdo infantil
+    yt = MagicMock()
+    upload.vetar(yt, "abc", False, True)
+    corpo = yt.videos.return_value.update.call_args.kwargs["body"]
+    assert corpo["status"]["selfDeclaredMadeForKids"] is True

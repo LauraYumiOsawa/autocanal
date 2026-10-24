@@ -49,3 +49,19 @@ def test_carregar_resolve_bin_do_claude(raiz_teste, monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
     assert config.resolver_bin_claude("claude") == str(tmp_path / ".local" / "bin" / "claude")
     assert config.resolver_bin_claude("/x/claude") == "/x/claude"
+
+
+def test_canal_campos_padrao(cfg):
+    c = cfg.canais["teste"]
+    assert c.feito_para_criancas is False
+    assert c.visuais == ["pixabay"]
+    assert c.estilo_visual == "realista"
+    assert c.estilo_ia == ""
+
+
+@pytest.mark.parametrize("campo, valor", [("visuais", ["pexels"]), ("estilo_visual", "aquarela")])
+def test_canal_visuais_invalido(cfg, campo, valor):
+    dados = cfg.canais["teste"].model_dump()
+    dados[campo] = valor
+    with pytest.raises(ValidationError):
+        type(cfg.canais["teste"]).model_validate(dados)

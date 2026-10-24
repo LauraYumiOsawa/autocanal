@@ -33,7 +33,13 @@ def formatar_publish_at(dt: datetime) -> str:
 
 
 def montar_corpo(
-    meta: dict, *, publish_at: datetime, categoria_id: str, idioma: str, sintetico: bool
+    meta: dict,
+    *,
+    publish_at: datetime,
+    categoria_id: str,
+    idioma: str,
+    sintetico: bool,
+    feito_para_criancas: bool,
 ) -> dict:
     return {
         "snippet": {
@@ -47,7 +53,7 @@ def montar_corpo(
         "status": {
             "privacyStatus": "private",
             "publishAt": formatar_publish_at(publish_at),
-            "selfDeclaredMadeForKids": False,
+            "selfDeclaredMadeForKids": feito_para_criancas,
             "containsSyntheticMedia": sintetico,
         },
     }
@@ -124,7 +130,9 @@ def definir_thumbnail(youtube, video_id: str, imagem: Path, *, media_factory=Med
     )
 
 
-def vetar(youtube, video_id: str, sintetico: bool = False) -> None:
+def vetar(
+    youtube, video_id: str, sintetico: bool = False, feito_para_criancas: bool = False
+) -> None:
     # update substitui a parte "status" inteira: reenviar madeForKids e o rótulo de mídia sintética
     _executar(
         youtube.videos().update(
@@ -133,7 +141,7 @@ def vetar(youtube, video_id: str, sintetico: bool = False) -> None:
                 "id": video_id,
                 "status": {
                     "privacyStatus": "private",
-                    "selfDeclaredMadeForKids": False,
+                    "selfDeclaredMadeForKids": feito_para_criancas,
                     "containsSyntheticMedia": sintetico,
                 },
             },

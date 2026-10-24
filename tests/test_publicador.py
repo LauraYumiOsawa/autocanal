@@ -378,3 +378,10 @@ def test_reaprovar_apos_rejeicao_reenvia(cfg, con, monkeypatch):
     assert env.call_count == 1
     n = fila.obter(con, j.id)
     assert n.estado == Estado.AGENDADO and n.youtube_video_id == "novo"
+
+
+def test_publicar_repassa_feito_para_criancas(cfg, con, envios):
+    cfg.canais["teste"].feito_para_criancas = True
+    _aprovado(cfg, con, AGORA + timedelta(days=2))
+    _pub(cfg, con, lambda c: MagicMock())
+    assert envios[0][2]["status"]["selfDeclaredMadeForKids"] is True
