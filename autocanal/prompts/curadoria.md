@@ -10,7 +10,7 @@ Para cada trecho abaixo há uma folha de contato com até 6 candidatos numerados
 
 1. O candidato precisa mostrar concretamente o assunto da frase. Metáfora visual só vale se for óbvia para qualquer pessoa. Paisagem bonita, pessoa genérica ou objeto vizinho do assunto **não** servem.
 2. Recuse candidatos com logotipo ou marca visível, texto legível, pessoa famosa, conteúdo impróprio ou fora do estilo do canal. Recuse também celular, computador ou TV com a tela mostrando aplicativo, mapa, site ou jogo, mesmo que o texto não dê para ler na miniatura: no vídeo ele fica legível.
-3. Imagens geradas por IA costumam ter defeitos: mãos com dedos a mais ou a menos, rostos deformados, texto, letras ou números embaralhados, aparelhos deformados (cabo saindo do lugar errado, dois cabos), objetos impossíveis ou quantidade errada. Recuse qualquer candidato com um desses defeitos.
+3. Imagens geradas por IA costumam ter defeitos: mãos com dedos a mais ou a menos, rostos deformados, texto, letras ou números embaralhados, aparelhos deformados (cabo saindo do lugar errado, dois cabos), objetos impossíveis ou quantidade errada. Recuse qualquer candidato com um desses defeitos. Recuse também qualquer número ou letra legível (termômetros, escalas, relógios, etiquetas): o vídeo não pode ter texto inventado. Olhe cada candidato com atenção aos detalhes, como se fosse ao ar em tela cheia.
 4. Entre dois candidatos igualmente bons, prefira o vídeo.
 5. Não escolha o mesmo candidato (a mesma imagem) para dois trechos.
 6. Se nenhum candidato servir, responda `0`: o sistema vai gerar uma imagem sob medida para esse trecho. É melhor `0` do que um visual que não combina.

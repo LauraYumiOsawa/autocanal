@@ -140,8 +140,11 @@ class FluxCurado:
                   if f"{p.id}_{marca}{k}" in geradas]
             if not vs:
                 continue
+            # células grandes, numa linha só: defeitos (dedos, letras) aparecem como na revisão
+            celula = (640, 360) if orientacao == "paisagem" else (360, 640)
             folha = folha_contato([m.caminho for m in vs], ["imagem"] * len(vs),
-                                  self.pasta / f"{p.id}{'' if marca == 'v' else '_simples'}.jpg")
+                                  self.pasta / f"{p.id}{'' if marca == 'v' else '_simples'}.jpg",
+                                  celula=celula, colunas=self.variantes, linhas=1)
             variantes[p.id] = vs
             itens.append(ItemCuradoria(p.id, p.texto, p.cena, folha, len(vs)))
         escolhas: dict[str, tuple[int, str]] = {}

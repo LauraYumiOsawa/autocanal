@@ -203,14 +203,21 @@ class PixabayCandidatos:
 FOLHA_CELULA = (400, 300)
 
 
-def folha_contato(previews: list[Path], tipos: list[str], saida: Path) -> Path:
-    """Grade 3×2 numerada (1 a 6) para o Claude escolher; marca os vídeos."""
-    cw, ch = FOLHA_CELULA
-    folha = Image.new("RGB", (cw * 3, ch * 2), (20, 20, 20))
+def folha_contato(
+    previews: list[Path],
+    tipos: list[str],
+    saida: Path,
+    celula: tuple[int, int] = FOLHA_CELULA,
+    colunas: int = 3,
+    linhas: int = 2,
+) -> Path:
+    """Grade numerada (por padrão 3×2, de 1 a 6) para o Claude escolher; marca os vídeos."""
+    cw, ch = celula
+    folha = Image.new("RGB", (cw * colunas, ch * linhas), (20, 20, 20))
     fonte_num = ImageFont.load_default(size=72)
     fonte_tag = ImageFont.load_default(size=30)
     for i, (arq, tipo) in enumerate(zip(previews, tipos)):
-        x, y = (i % 3) * cw, (i // 3) * ch
+        x, y = (i % colunas) * cw, (i // colunas) * ch
         with Image.open(arq) as im:
             folha.paste(ImageOps.fit(im.convert("RGB"), (cw, ch)), (x, y))
         d = ImageDraw.Draw(folha)

@@ -141,7 +141,7 @@ def test_flux_curado_gera_variantes_e_escolhe(tmp_path):
     assert (m.origem, m.url, m.prompt, m.motivo) == (
         "flux", "flux:seg_01_v2", "prompt seg_01_v2", "mostra o roteador sem defeitos")
     with Image.open(tmp_path / "flux_curadoria" / "seg_01.jpg") as im:
-        assert im.size == (1200, 600)
+        assert im.size == (1080, 640)  # 3 variantes retrato de 360×640 lado a lado
 
 
 def test_flux_curado_sem_variantes_nao_chama_claude(tmp_path):
@@ -195,3 +195,19 @@ def test_flux_curado_segunda_chance_com_cena_simples(tmp_path):
     assert recebidos[1] == [("seg_01_s1", "fast charger phone"), ("seg_01_s2", "fast charger phone")]
     assert chamadas == [["seg_01", "seg_02"], ["seg_01"]]
     assert r["seg_01"].url == "flux:seg_01_s1"
+
+
+@pytest.mark.parametrize("orientacao, tamanho", [("retrato", (1080, 640)), ("paisagem", (1920, 360))])
+def test_flux_curado_folha_grande_para_ver_defeitos(tmp_path, orientacao, tamanho):
+    # a revisão pegou defeitos que a curadoria não via em miniaturas de 400×300
+    from autocanal.provedores.curadoria import FluxCurado
+    cur = FluxCurado(GeradorFalso(), lambda itens: {i.id: (1, "ok") for i in itens}, tmp_path / "fc")
+    cur.buscar_lote(_pedidos(tmp_path, ["a"]), orientacao, set())
+    with Image.open(tmp_path / "fc" / "seg_01.jpg") as im:
+        assert im.size == tamanho
+
+
+def test_prompts_de_curadoria_e_revisao_mais_estritos():
+    base = Path(__file__).parents[1] / "autocanal" / "prompts"
+    assert "número ou letra legível" in (base / "curadoria.md").read_text(encoding="utf-8")
+    assert "No Short não há thumbnail" in (base / "revisao.md").read_text(encoding="utf-8")
