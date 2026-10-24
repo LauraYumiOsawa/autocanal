@@ -9,7 +9,7 @@ Formato: {formato}
 - `transcricao.json`: a transcrição da narração que foi realmente gerada.
 - `metadados.json`: título, texto da thumbnail, descrição final, tags e capítulos.
 - `thumbnail.jpg` (só no vídeo médio): abra com Read e confira se o texto está legível, se a imagem combina com o título e se não tem marca, logotipo ou pessoa famosa.
-- `fontes_midia.json`: origem, URL, licença e, quando houver, o motivo da escolha de cada imagem ou vídeo usado (na ordem dos segmentos).
+- `fontes_midia.json`: origem, URL, licença e, quando houver, o motivo da escolha de cada imagem ou vídeo usado (na ordem dos segmentos). O crédito "Imagens: Pixabay" e o aviso de IA da descrição são gerados automaticamente a partir deste arquivo, na proporção certa: não peça para mudar a redação deles.
 - Quadros extraídos do vídeo final (abra cada um com Read):
 {quadros}
 

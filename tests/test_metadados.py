@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from pathlib import Path
 from datetime import UTC, datetime
 
 import pytest
@@ -208,8 +209,10 @@ def test_capitulos_menos_de_3_vazio():
 
 @pytest.mark.parametrize("origens, esperado", [
     (["pixabay", "procedural"], "Imagens: Pixabay"),
-    (["flux"], "Algumas imagens deste vídeo foram geradas por IA."),
+    (["flux"], "As imagens deste vídeo foram geradas por IA."),
     (["flux", "pixabay"], "Imagens: Pixabay\nAlgumas imagens deste vídeo foram geradas por IA."),
+    # prova real: 9 de 11 do FLUX e o aviso "Algumas" contradizia o revisor
+    (["flux", "flux", "pixabay"], "Imagens: Pixabay\nA maioria das imagens deste vídeo foi gerada por IA."),
     (["procedural"], ""),
 ])
 def test_creditos(origens, esperado):
@@ -246,3 +249,8 @@ def test_metadados_guarda_descricao_base(ctx, cfg, claude_falso):
     claude_falso.responder(_ok(_metadados()))
     metadados.executar(ctx)
     assert ler_json(ctx, "metadados.json")["descricao"] == "O sal do mar vem das rochas ‹de verdade›."
+
+
+def test_prompt_metadados_deixa_creditos_para_o_sistema():
+    texto = (Path(metadados.__file__).parents[1] / "prompts" / "metadados.md").read_text(encoding="utf-8")
+    assert "avisos de IA" in texto

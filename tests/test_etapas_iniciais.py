@@ -544,5 +544,5 @@ def test_visuais_refeitos_atualizam_creditos_e_sintetico(ctx, cfg, monkeypatch):
     m = ler_json(ctx, "metadados.json")
     assert m["sintetico"] is True
     assert m["descricao_final"] == (
-        "Resumo.\n\nAlgumas imagens deste vídeo foram geradas por IA.\n\n"
+        "Resumo.\n\nAs imagens deste vídeo foram geradas por IA.\n\n"
         "Fontes:\nhttps://exemplo.org/mar\n\n#shorts")

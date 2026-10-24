@@ -35,7 +35,7 @@ Formato: {formato}
 - `titulo`: o título escolhido, com até 100 caracteres (de preferência até 60), sem `<` nem `>`.
 - `texto_thumb`: o texto da thumbnail do par escolhido (até 3 palavras).
 - `cena_thumb`: de 15 a 40 palavras **em inglês** descrevendo a imagem de fundo da thumbnail: uma cena concreta e chamativa que mostre a promessa do título, com o assunto à direita e espaço livre à esquerda para o texto. Sem texto escrito na imagem, sem marcas, logotipos ou pessoas reais e famosas.
-- `descricao`: as duas primeiras linhas dizem o que o vídeo entrega, com as palavras das consultas-alvo; depois, um parágrafo curto. Até 4500 caracteres, sem `<` nem `>`. Não coloque links, fontes, capítulos nem hashtags: as fontes do roteiro e as hashtags do formato são acrescentadas automaticamente.
+- `descricao`: as duas primeiras linhas dizem o que o vídeo entrega, com as palavras das consultas-alvo; depois, um parágrafo curto. Até 4500 caracteres, sem `<` nem `>`. Não coloque links, fontes, capítulos, hashtags, créditos de imagem nem avisos de IA: as fontes do roteiro, os capítulos, os créditos, o aviso de IA e as hashtags do formato são acrescentados automaticamente.
 - `tags`: até 15, só para desambiguar (grafias, siglas e nomes que as pessoas digitam), sem `#`.
 - `capitulos`: deixe a lista vazia; o sistema calcula os capítulos a partir das seções do roteiro.
 - `consultas_alvo`: exatamente 3 buscas que uma pessoa real digitaria e que este vídeo deve vencer. O título e as duas primeiras linhas da descrição precisam conter as palavras delas.

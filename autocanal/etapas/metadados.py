@@ -49,7 +49,10 @@ METADADOS = {
 
 
 CREDITO_PIXABAY = "Imagens: Pixabay"
+AVISO_IA_TODAS = "As imagens deste vídeo foram geradas por IA."
+AVISO_IA_MAIORIA = "A maioria das imagens deste vídeo foi gerada por IA."
 AVISO_IA = "Algumas imagens deste vídeo foram geradas por IA."
+AVISOS_IA = (AVISO_IA_TODAS, AVISO_IA_MAIORIA, AVISO_IA)
 
 
 def capitulos_calculados(roteiro: dict, narracao: dict, minimo_s: float = 10.0) -> list[dict]:
@@ -84,11 +87,17 @@ def capitulos_calculados(roteiro: dict, narracao: dict, minimo_s: float = 10.0) 
 
 
 def creditos(fontes: list[dict]) -> str:
-    origens = {f.get("origem") for f in fontes}
+    """Crédito do Pixabay e aviso de IA proporcional (todas / a maioria / algumas)."""
+    origens = [f.get("origem") for f in fontes]
+    n_flux = origens.count("flux")
     linhas = []
     if "pixabay" in origens:
         linhas.append(CREDITO_PIXABAY)
-    if "flux" in origens:
+    if n_flux == len(origens) and n_flux:
+        linhas.append(AVISO_IA_TODAS)
+    elif n_flux * 2 > len(origens):
+        linhas.append(AVISO_IA_MAIORIA)
+    elif n_flux:
         linhas.append(AVISO_IA)
     return "\n".join(linhas)
 
