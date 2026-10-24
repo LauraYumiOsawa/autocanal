@@ -86,6 +86,25 @@ class ConfigRevisao(BaseModel):
     supervisao_dias: int = 14
 
 
+class ConfigFlux(BaseModel):
+    """FLUX.2 [klein] 4B em lote no projeto uv `projeto` (caminhos já resolvidos pela raiz)."""
+
+    projeto: Path = Path("servicos/flux")
+    uv: Path = Path.home() / ".local/share/autocanal-tools/bin/uv"
+    passos: int = 4
+    largura: int = 1360  # paisagem; o retrato inverte
+    altura: int = 768
+    ram_minima_gb: float = 6.0
+    vram_minima_gb: float = 7.0
+    timeout_base_s: int = 180
+    timeout_por_item_s: int = 45
+    sufixos: dict[str, str] = {
+        "realista": "photorealistic photo, natural light, no text, no watermark",
+        "desenho": "colorful 2D cartoon illustration, clean lines, flat shading, no text, "
+                   "no watermark",
+    }
+
+
 class Config(BaseModel):
     raiz: Path
     dados: Path
@@ -99,6 +118,7 @@ class Config(BaseModel):
     claude: ConfigClaude
     whisper: ConfigWhisper = ConfigWhisper()
     revisao: ConfigRevisao = ConfigRevisao()
+    flux: ConfigFlux = ConfigFlux()
     chaves: dict[str, str]
     canais: dict[str, Canal]
 
@@ -156,6 +176,12 @@ def carregar(raiz: Path) -> Config:
         dados["fonte_arquivo"] = _caminho(raiz, dados["fonte_arquivo"])
         dados["perfil_voz"] = _caminho(raiz, dados["perfil_voz"])
         canais[slug] = Canal(slug=slug, **dados)
+
+    flux_cfg = dict(base.get("flux") or {})
+    flux_cfg["projeto"] = _caminho(raiz, flux_cfg.get("projeto", "servicos/flux"))
+    if "uv" in flux_cfg:
+        flux_cfg["uv"] = _caminho(raiz, flux_cfg["uv"])
+    base["flux"] = flux_cfg
 
     claude_cfg = dict(base.get("claude") or {})
     claude_cfg["bin"] = resolver_bin_claude(str(claude_cfg.get("bin") or "claude"))

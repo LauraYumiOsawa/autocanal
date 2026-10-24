@@ -465,3 +465,58 @@ def test_prompts_pedem_uma_frase():
         texto = (Path(__file__).parents[1] / "autocanal" / "prompts" / f"{nome}.md").read_text(
             encoding="utf-8")
         assert "uma única frase" in texto and "`cena`" in texto
+
+
+def _instalar_flux_falso(cfg):
+    cfg.flux.projeto.mkdir(parents=True, exist_ok=True)
+    (cfg.flux.projeto / "pyproject.toml").write_text("[project]\n")
+    (cfg.flux.projeto / "gerar.py").write_text("")
+
+
+class _FluxRegistra:
+    def __init__(self, eventos):
+        self.nome, self.eventos = "flux", eventos
+
+    def __call__(self, cfg, **kw):
+        self.kw = kw
+        return self
+
+    def buscar_lote(self, pedidos, orientacao, excluir):
+        from PIL import Image
+
+        from autocanal.provedores.imagens import MidiaObtida
+        self.eventos.append("lote")
+        saida = {}
+        for p in pedidos:
+            caminho = Path(str(p.destino_sem_ext) + ".png")
+            Image.new("RGB", (64, 36)).save(caminho)
+            saida[p.id] = MidiaObtida(caminho, "imagem", "flux", f"flux:{p.id}", "livre",
+                                      "autocanal", prompt=p.cena)
+        return saida
+
+
+def test_visuais_libera_memoria_antes_do_flux(ctx, cfg, monkeypatch):
+    from autocanal import legendas as mod_legendas
+    from autocanal import servicos
+    eventos: list[str] = []
+    _instalar_flux_falso(cfg)
+    cfg.canais["teste"].visuais = ["flux"]
+    gerador = _FluxRegistra(eventos)
+    monkeypatch.setattr(visuais, "GeradorFlux", gerador)
+    monkeypatch.setattr(mod_legendas, "liberar_modelos", lambda: eventos.append("whisper"))
+    monkeypatch.setattr(servicos, "parar_kokoro", lambda raiz: eventos.append("kokoro"))
+    _segmentos(ctx, ["a b", "c d"])
+    visuais.executar(ctx)
+    assert eventos == ["whisper", "kokoro", "lote"]
+    assert gerador.kw == {"job_id": ctx.job.id, "rodada": 0, "estilo_visual": "realista",
+                          "estilo_ia": ""}
+    assert [f["origem"] for f in ler_json(ctx, "fontes_midia.json")] == ["flux", "flux"]
+
+
+def test_visuais_flux_nao_instalado_segue(ctx, cfg, caplog):
+    caplog.set_level("WARNING", logger="autocanal.etapas.visuais")
+    cfg.canais["teste"].visuais = ["flux"]
+    _segmentos(ctx, ["a b"])
+    visuais.executar(ctx)
+    assert ler_json(ctx, "fontes_midia.json")[0]["origem"] == "procedural"
+    assert any("FLUX" in r.getMessage() for r in caplog.records)

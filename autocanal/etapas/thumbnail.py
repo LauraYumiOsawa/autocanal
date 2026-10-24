@@ -1,14 +1,18 @@
 """Etapa thumbnail (médio): imagem-base 1280×720 + texto do `yt-package` em caixa alta."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from autocanal.config import Canal
 from autocanal.etapas.base import Contexto, gravar_json, ler_json
-from autocanal.provedores.imagens import FundoProcedural
+from autocanal.provedores import ErroProvedor, flux
+from autocanal.provedores.flux import GeradorFlux
+from autocanal.provedores.imagens import FundoProcedural, Pedido
 
+log = logging.getLogger(__name__)
 LARGURA, ALTURA = 1280, 720
 MARGEM = 48
 CAIXA = (int(LARGURA * 0.45), int(ALTURA * 0.60))  # terço esquerdo
@@ -64,8 +68,28 @@ def compor_thumbnail(base: Path, texto: str, canal: Canal, saida: Path) -> Path:
         qualidade -= 10
 
 
+def _base_flux(ctx: Contexto, meta: dict) -> Path | None:
+    if not ("flux" in ctx.canal.visuais and meta.get("cena_thumb") and flux.instalado(ctx.cfg)):
+        return None
+    flux.preparar_memoria(ctx.cfg.raiz)
+    gerador = GeradorFlux(ctx.cfg, job_id=ctx.job.id, rodada=ctx.job.tentativas_revisao,
+                          estilo_visual=ctx.canal.estilo_visual, estilo_ia=ctx.canal.estilo_ia)
+    pedido = Pedido("thumbnail_base", meta["titulo"], meta["titulo"], meta["cena_thumb"],
+                    ctx.pasta / "thumbnail_base")
+    try:
+        m = gerador.buscar_lote([pedido], "paisagem", set()).get(pedido.id)
+    except ErroProvedor as e:
+        log.warning("FLUX não gerou a base da thumbnail de %s: %s", ctx.job.id, e)
+        return None
+    return m.caminho if m else None
+
+
 def imagem_base(ctx: Contexto, meta: dict) -> tuple[Path, str]:
-    """Primeiro visual não procedural do vídeo (vídeo → quadro do meio); senão procedural."""
+    """FLUX com a `cena_thumb`; senão o primeiro visual não procedural do vídeo (vídeo → quadro
+    do meio); senão procedural."""
+    gerada = _base_flux(ctx, meta)
+    if gerada is not None:
+        return gerada, "flux"
     arq = ctx.pasta / "fontes_midia.json"
     fontes = ler_json(ctx, "fontes_midia.json") if arq.exists() else []
     for f in fontes:

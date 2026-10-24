@@ -2,13 +2,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 
 from autocanal import claude
 from autocanal.claude import ErroClaude, ErroClaudeIndisponivel, LimiteUsoClaude
 from autocanal.etapas.base import Contexto, ErroEtapa, carregar_prompt, gravar_json, ler_json
+from autocanal.provedores import flux
 from autocanal.provedores.curadoria import CuradoriaPixabay, Escolher, ItemCuradoria
+from autocanal.provedores.flux import GeradorFlux
 from autocanal.provedores.imagens import Pedido, PixabayCandidatos, criar_cadeia, resolver
+
+log = logging.getLogger(__name__)
 
 CURADORIA = {
     "type": "object",
@@ -86,7 +91,18 @@ def executar(ctx: Contexto) -> None:
     if chave and "pixabay" in ctx.canal.visuais:
         pixabay = CuradoriaPixabay(PixabayCandidatos(chave), escolher_com_claude(ctx),
                                    ctx.canal.estilo_visual, pasta / "curadoria")
-    cadeia = criar_cadeia(ctx.cfg, ctx.canal, fmt.largura, fmt.altura, pixabay=pixabay)
+    gerador = None
+    if "flux" in ctx.canal.visuais:
+        if flux.instalado(ctx.cfg):
+            flux.preparar_memoria(ctx.cfg.raiz)
+            gerador = GeradorFlux(ctx.cfg, job_id=ctx.job.id, rodada=ctx.job.tentativas_revisao,
+                                  estilo_visual=ctx.canal.estilo_visual,
+                                  estilo_ia=ctx.canal.estilo_ia)
+        else:
+            log.warning("o canal %s pede FLUX, mas servicos/flux não está instalado",
+                        ctx.canal.slug)
+    cadeia = criar_cadeia(ctx.cfg, ctx.canal, fmt.largura, fmt.altura, pixabay=pixabay,
+                          flux=gerador)
     pedidos = [
         Pedido(f"seg_{i:02d}", seg["visual"], seg["texto"], seg.get("cena", ""),
                pasta / f"seg_{i:02d}")

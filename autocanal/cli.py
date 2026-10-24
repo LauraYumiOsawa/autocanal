@@ -18,6 +18,7 @@ from autocanal.config import Config, carregar
 from autocanal.db import conectar
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
+from autocanal.provedores import flux
 from autocanal.youtube import oauth, upload
 
 app = typer.Typer(help="Criação e publicação automática de vídeos no YouTube.")
@@ -96,6 +97,10 @@ def diagnostico(ctx: typer.Context) -> None:
     for nome in ("PIXABAY_API_KEY", "GOOGLE_TTS_API_KEY", "YOUTUBE_API_KEY"):
         definida = bool(cfg.chaves.get(nome))
         typer.echo(f"[{'OK   ' if definida else 'FALHA'}] {nome}: {'definida' if definida else 'ausente'}")
+    if flux.instalado(cfg):
+        _linha(True, "flux", str(cfg.flux.projeto.relative_to(cfg.raiz)))
+    else:
+        typer.echo("[FALHA] flux: não instalado (opcional)")
     tokens = sorted((cfg.dados / "tokens").glob("*.json")) if (cfg.dados / "tokens").is_dir() else []
     typer.echo(f"tokens em dados/tokens/: {', '.join(t.stem for t in tokens) or 'nenhum'}")
     if not all(resultados[:2]):

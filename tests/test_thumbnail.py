@@ -91,3 +91,32 @@ def test_thumbnail_executar_grava_jpg_e_origem(ctx):
         assert im.size == (1280, 720)
     assert ler_json(ctx, "thumbnail.json") == {"base_origem": "pixabay"}
     assert etapas.REGISTRO["thumbnail"] is thumbnail.executar
+
+
+def test_thumbnail_usa_flux_primeiro(ctx, cfg, monkeypatch):
+    from autocanal.provedores.imagens import MidiaObtida
+
+    cfg.flux.projeto.mkdir(parents=True)
+    (cfg.flux.projeto / "pyproject.toml").write_text("[project]\n")
+    (cfg.flux.projeto / "gerar.py").write_text("")
+    cfg.canais["teste"].visuais = ["pixabay", "flux"]
+    recebidos = []
+
+    class Gerador:
+        nome = "flux"
+
+        def __init__(self, cfg, **kw):
+            pass
+
+        def buscar_lote(self, pedidos, orientacao, excluir):
+            recebidos.append((pedidos[0].cena, orientacao))
+            caminho = _imagem(Path(str(pedidos[0].destino_sem_ext) + ".png"))
+            return {pedidos[0].id: MidiaObtida(caminho, "imagem", "flux", "flux:1", "x", "y")}
+
+    monkeypatch.setattr(thumbnail, "GeradorFlux", Gerador)
+    monkeypatch.setattr(thumbnail.flux, "preparar_memoria", lambda raiz: None)
+    _imagem(ctx.pasta / "visuais" / "seg_01.jpg")
+    gravar_json(ctx, "fontes_midia.json", [
+        {"caminho": "visuais/seg_01.jpg", "tipo": "imagem", "origem": "pixabay"}])
+    caminho, origem = thumbnail.imagem_base(ctx, ler_json(ctx, "metadados.json"))
+    assert origem == "flux" and recebidos == [("a router at night", "paisagem")]

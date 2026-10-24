@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import difflib
+import gc
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -37,6 +38,12 @@ def _modelo(modelo: str, dispositivo: str, compute_type: str):
             modelo, device=dispositivo, compute_type=compute_type
         )
     return _MODELOS[chave]
+
+
+def liberar_modelos() -> None:
+    """Solta os modelos do Whisper em cache (libera a placa antes do FLUX)."""
+    _MODELOS.clear()
+    gc.collect()
 
 
 def transcrever(

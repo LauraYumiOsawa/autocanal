@@ -442,3 +442,12 @@ def test_diagnostico_lista_chaves_sem_pexels(rodar, monkeypatch):
     r = rodar("diagnostico")
     assert "PIXABAY_API_KEY" in r.output and "GOOGLE_TTS_API_KEY" in r.output
     assert "PEXELS" not in r.output
+
+
+def test_diagnostico_mostra_flux(rodar, monkeypatch, cfg):
+    monkeypatch.setattr(cli, "_executa", lambda cmd: (True, "ok"))
+    assert "[FALHA] flux: não instalado (opcional)" in rodar("diagnostico").output
+    cfg.flux.projeto.mkdir(parents=True)
+    (cfg.flux.projeto / "pyproject.toml").write_text("[project]\n")
+    (cfg.flux.projeto / "gerar.py").write_text("")
+    assert "[OK   ] flux" in rodar("diagnostico").output
