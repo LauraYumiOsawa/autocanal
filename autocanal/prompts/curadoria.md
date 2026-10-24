@@ -9,7 +9,7 @@ Para cada trecho abaixo há uma folha de contato com até 6 candidatos numerados
 ## Regras
 
 1. O candidato precisa mostrar concretamente o assunto da frase. Metáfora visual só vale se for óbvia para qualquer pessoa. Paisagem bonita, pessoa genérica ou objeto vizinho do assunto **não** servem.
-2. Recuse candidatos com logotipo ou marca visível, texto legível, pessoa famosa, conteúdo impróprio ou fora do estilo do canal.
+2. Recuse candidatos com logotipo ou marca visível, texto legível, pessoa famosa, conteúdo impróprio ou fora do estilo do canal. Recuse também celular, computador ou TV com a tela mostrando aplicativo, mapa, site ou jogo, mesmo que o texto não dê para ler na miniatura: no vídeo ele fica legível.
 3. Entre dois candidatos igualmente bons, prefira o vídeo.
 4. Não escolha o mesmo candidato (a mesma imagem) para dois trechos.
 5. Se nenhum candidato servir, responda `0`: o sistema vai gerar uma imagem sob medida para esse trecho. É melhor `0` do que um visual que não combina.
