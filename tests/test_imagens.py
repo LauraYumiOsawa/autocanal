@@ -7,11 +7,14 @@ from PIL import Image
 from autocanal.config import Paleta
 from autocanal.provedores import ErroProvedor
 from autocanal.provedores.imagens import (
+    Candidato,
     FundoProcedural,
     MidiaObtida,
-    PixabayImagens,
-    buscar_em_cadeia,
+    Pedido,
+    PixabayCandidatos,
     criar_cadeia,
+    folha_contato,
+    resolver,
 )
 
 FONTE = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
@@ -67,88 +70,176 @@ def test_como_dict(tmp_path):
     assert d["caminho"] == str(m.caminho) and isinstance(d["caminho"], str)
 
 
-def test_pixabay_video_e_chave_fora_do_erro(tmp_path):
-    hit = {"pageURL": "https://pixabay.com/v/1", "user": "Caio", "videos": {
-        "large": {"url": "https://pb/l.mp4", "width": 1080, "height": 1920},
-        "medium": {"url": "https://pb/m.mp4", "width": 720, "height": 1280}}}
-    s = SessaoFalsa({
-        "https://pixabay.com/api/videos/": Resp(json_={"hits": [hit]}),
-        "https://pb/l.mp4": Resp(content=b"PB"),
-    })
-    m = PixabayImagens("SEGREDO", sessao=s).buscar("mar", "retrato", tmp_path / "s", set())
-    assert m.tipo == "video" and m.licenca == "Pixabay Content License" and m.autor == "Caio"
-    assert s.chamadas[0][1]["orientation"] == "vertical"
-    assert s.chamadas[0][1]["key"] == "SEGREDO"
+VIDEOS = "https://pixabay.com/api/videos/"
+FOTOS = "https://pixabay.com/api/"
 
-    s2 = SessaoFalsa(erro=requests.ConnectionError("https://pixabay.com/api/?key=SEGREDO"))
+
+def _hit_video(n, w=1080, h=1920, **extra):
+    return {"pageURL": f"https://pixabay.com/videos/v{n}", "user": f"u{n}", **extra,
+            "videos": {"large": {"url": f"https://pb/v{n}.mp4", "width": w, "height": h,
+                                 "thumbnail": f"https://pb/v{n}.jpg"}}}
+
+
+def _hit_img(n, **extra):
+    return {"pageURL": f"https://pixabay.com/photos/i{n}", "user": f"u{n}", **extra,
+            "webformatURL": f"https://pb/i{n}_640.jpg", "largeImageURL": f"https://pb/i{n}.jpg"}
+
+
+def _sessao(videos=(), fotos=()):
+    # a URL de vídeos tem a de fotos como prefixo: vídeos primeiro no dicionário
+    return SessaoFalsa({VIDEOS: Resp(json_={"hits": list(videos)}),
+                        FOTOS: Resp(json_={"hits": list(fotos)}),
+                        "https://pb/": Resp(content=b"BYTES")})
+
+
+@pytest.mark.parametrize("estilo, orientacao, video_type, image_type, orientation", [
+    ("realista", "retrato", "film", "photo", "vertical"),
+    ("desenho", "paisagem", "animation", "illustration", "horizontal"),
+])
+def test_candidatos_filtros_por_estilo(estilo, orientacao, video_type, image_type, orientation):
+    s = _sessao()
+    assert PixabayCandidatos("k", sessao=s).buscar("mar", orientacao, estilo, set()) == []
+    (u1, p1, _), (u2, p2, _) = s.chamadas
+    assert u1 == VIDEOS and p1["video_type"] == video_type and p1["per_page"] == 20
+    assert p1["safesearch"] == "true" and p1["key"] == "k" and p1["q"] == "mar"
+    assert u2 == FOTOS and p2["image_type"] == image_type and p2["orientation"] == orientation
+
+
+def test_candidatos_descarta_baixa_qualidade_e_ia():
+    videos = [_hit_video(1, isLowQuality=True), _hit_video(2, isAiGenerated=True), _hit_video(3)]
+    real = PixabayCandidatos("k", sessao=_sessao(videos)).buscar("x", "retrato", "realista", set())
+    assert [c.pagina for c in real] == ["https://pixabay.com/videos/v3"]
+    desenho = PixabayCandidatos("k", sessao=_sessao(videos)).buscar("x", "retrato", "desenho", set())
+    assert [c.pagina for c in desenho] == [
+        "https://pixabay.com/videos/v2", "https://pixabay.com/videos/v3"]
+
+
+def test_candidatos_ordem_e_limite():
+    s = _sessao([_hit_video(i) for i in range(5)], [_hit_img(i) for i in range(5)])
+    cs = PixabayCandidatos("k", sessao=s).buscar("x", "retrato", "realista", set())
+    assert [c.tipo for c in cs] == ["video"] * 4 + ["imagem"] * 2
+    assert cs[0] == Candidato("video", "https://pixabay.com/videos/v0", "https://pb/v0.jpg",
+                              "https://pb/v0.mp4", "u0")
+    assert cs[4] == Candidato("imagem", "https://pixabay.com/photos/i0", "https://pb/i0_640.jpg",
+                              "https://pb/i0.jpg", "u0")
+
+
+def test_candidatos_respeita_orientacao_e_excluir():
+    s = _sessao([_hit_video(1, w=1920, h=1080), _hit_video(2)], [_hit_img(1), _hit_img(2)])
+    cs = PixabayCandidatos("k", sessao=s).buscar(
+        "x", "retrato", "realista", {"https://pixabay.com/photos/i1"})
+    assert [c.pagina for c in cs] == ["https://pixabay.com/videos/v2", "https://pixabay.com/photos/i2"]
+
+
+def test_candidatos_chave_fora_do_erro():
+    s = SessaoFalsa(erro=requests.ConnectionError("https://pixabay.com/api/?key=SEGREDO"))
     with pytest.raises(ErroProvedor) as e:
-        PixabayImagens("SEGREDO", sessao=s2).buscar("mar", "retrato", tmp_path / "t", set())
+        PixabayCandidatos("SEGREDO", sessao=s).buscar("mar", "retrato", "realista", set())
     assert "SEGREDO" not in str(e.value) and e.value.__cause__ is None
 
 
-def test_pixabay_imagem(tmp_path):
-    hit = {"pageURL": "https://pixabay.com/p/1", "user": "Dani", "largeImageURL": "https://pb/i.jpg"}
-    s = SessaoFalsa({
-        "https://pixabay.com/api/videos/": Resp(json_={"hits": []}),
-        "https://pixabay.com/api/": Resp(json_={"hits": [hit]}),
-        "https://pb/i.jpg": Resp(content=b"IMG"),
-    })
-    m = PixabayImagens("k", sessao=s).buscar("mar", "paisagem", tmp_path / "s", set())
-    assert m.tipo == "imagem" and m.caminho.suffix == ".jpg"
-    assert s.chamadas[0][1]["safesearch"] == "true"
+def test_baixar_video_e_imagem(tmp_path):
+    fonte = PixabayCandidatos("k", sessao=_sessao())
+    v = fonte.baixar(Candidato("video", "https://pixabay.com/videos/v1", "https://pb/v1.jpg",
+                               "https://pb/v1.mp4", "Ana"), tmp_path / "seg_01")
+    assert v.caminho == tmp_path / "seg_01.mp4" and v.caminho.read_bytes() == b"BYTES"
+    assert (v.tipo, v.origem, v.url, v.licenca, v.autor) == (
+        "video", "pixabay", "https://pixabay.com/videos/v1", "Pixabay Content License", "Ana")
+    i = fonte.baixar(Candidato("imagem", "https://pixabay.com/photos/i1", "https://pb/i1_640.jpg",
+                               "https://pb/i1.jpg", "Bia"), tmp_path / "seg_02")
+    assert i.caminho.suffix == ".jpg" and i.tipo == "imagem"
 
 
-def test_pixabay_video_so_na_orientacao_pedida(tmp_path):
-    # a API de vídeos do Pixabay ignora `orientation`: o filtro é nosso
-    hit = {"pageURL": "https://pixabay.com/v/2", "user": "Edu", "videos": {
-        "large": {"url": "https://pb/h.mp4", "width": 1920, "height": 1080},
-        "medium": {"url": "https://pb/hm.mp4", "width": 1280, "height": 720}}}
-    foto = {"pageURL": "https://pixabay.com/p/2", "user": "Fe", "largeImageURL": "https://pb/v.jpg"}
-    respostas = {
-        "https://pixabay.com/api/videos/": Resp(json_={"hits": [hit]}),
-        "https://pixabay.com/api/": Resp(json_={"hits": [foto]}),
-        "https://pb/": Resp(content=b"X"),
-    }
-    s = SessaoFalsa(respostas)
-    m = PixabayImagens("k", sessao=s).buscar("mar", "retrato", tmp_path / "r", set())
-    assert m.tipo == "imagem" and m.url == "https://pixabay.com/p/2"
-    assert s.chamadas[0][1]["per_page"] == 20  # mais candidatos: vídeo vertical é raro
-
-    m = PixabayImagens("k", sessao=SessaoFalsa(respostas)).buscar(
-        "mar", "paisagem", tmp_path / "p", set())
-    assert m.tipo == "video" and m.url == "https://pixabay.com/v/2"
+def test_baixar_preview(tmp_path):
+    c = Candidato("imagem", "https://pixabay.com/photos/i1", "https://pb/i1_640.jpg",
+                  "https://pb/i1.jpg", "Bia")
+    destino = PixabayCandidatos("k", sessao=_sessao()).baixar_preview(c, tmp_path / "p.jpg")
+    assert destino.read_bytes() == b"BYTES"
 
 
-class Quebrado:
-    nome = "q"
+@pytest.mark.parametrize("n", [6, 2])
+def test_folha_contato(tmp_path, n):
+    previews = []
+    for i in range(n):
+        arq = tmp_path / f"p{i}.png"
+        Image.new("RGB", (640, 360 + 40 * i), (40 * i, 100, 150)).save(arq)
+        previews.append(arq)
+    tipos = ["video", "imagem"] * (n // 2)
+    folha = folha_contato(previews, tipos, tmp_path / "folha.jpg")
+    with Image.open(folha) as im:
+        assert im.format == "JPEG" and im.size == (1200, 600)
 
-    def buscar(self, *a, **k):
-        raise ErroProvedor("falhou")
+
+def _pedidos(tmp_path, n=3):
+    return [Pedido(f"seg_{i:02d}", f"q{i}", f"texto {i}", f"cena {i}", tmp_path / f"seg_{i:02d}")
+            for i in range(1, n + 1)]
 
 
-class Vazio:
-    nome = "v"
+def _midia(tmp_path, pid, url):
+    caminho = tmp_path / f"{pid}.png"
+    caminho.write_bytes(b"x")
+    return MidiaObtida(caminho, "imagem", "dublê", url, "livre", "autor")
 
-    def buscar(self, *a, **k):
-        return None
+
+class Lote:
+    def __init__(self, nome, tmp_path, resolve=(), erro=False):
+        self.nome, self.tmp, self.resolve, self.erro = nome, tmp_path, set(resolve), erro
+        self.chamadas = []
+
+    def buscar_lote(self, pedidos, orientacao, excluir):
+        self.chamadas.append(([p.id for p in pedidos], set(excluir)))
+        if self.erro:
+            raise ErroProvedor("falhou")
+        return {p.id: _midia(self.tmp, p.id, f"https://{self.nome}/{p.id}")
+                for p in pedidos if p.id in self.resolve}
 
 
-def test_cadeia_cai_para_procedural(tmp_path, caplog):
+class SoPrimeiro:
+    nome = "so_primeiro"
+
+    def __init__(self, tmp_path):
+        self.tmp = tmp_path
+
+    def buscar(self, consulta, orientacao, destino_sem_ext, excluir):
+        return _midia(self.tmp, "x", "https://p/1") if consulta == "q1" else None
+
+
+def test_resolver_lote_recebe_so_pendentes(tmp_path):
+    lote = Lote("lote", tmp_path, resolve={"seg_02", "seg_03"})
+    r = resolver([SoPrimeiro(tmp_path), lote], _pedidos(tmp_path), "retrato", set())
+    assert sorted(r) == ["seg_01", "seg_02", "seg_03"]
+    assert [ids for ids, _ in lote.chamadas] == [["seg_02", "seg_03"]]
+
+
+def test_resolver_erro_do_lote_segue(tmp_path, caplog):
     caplog.set_level("WARNING", logger="autocanal.provedores.imagens")
-    m = buscar_em_cadeia([Quebrado(), Vazio(), _fundo()], "gato", "retrato", tmp_path / "s", set())
-    assert isinstance(m, MidiaObtida) and m.origem == "procedural"
+    r = resolver([Lote("quebrado", tmp_path, erro=True), _fundo()], _pedidos(tmp_path),
+                 "retrato", set())
+    assert {m.origem for m in r.values()} == {"procedural"}
     [aviso] = caplog.records
-    assert aviso.levelname == "WARNING" and "q" in aviso.getMessage()
-    assert "falhou" in aviso.getMessage()
+    assert "quebrado" in aviso.getMessage() and "falhou" in aviso.getMessage()
 
 
-def test_criar_cadeia_sem_chaves(cfg):
+def test_resolver_mantem_excluir(tmp_path):
+    primeiro = Lote("a", tmp_path, resolve={"seg_01"})
+    segundo = Lote("b", tmp_path, resolve={"seg_02", "seg_03"})
+    excluir = {"https://antiga/1"}
+    resolver([primeiro, segundo], _pedidos(tmp_path), "retrato", excluir)
+    assert segundo.chamadas[0][1] == {"https://antiga/1", "https://a/seg_01"}
+
+
+def test_resolver_sem_midia_falha(tmp_path):
+    with pytest.raises(ErroProvedor):
+        resolver([Lote("vazio", tmp_path)], _pedidos(tmp_path), "retrato", set())
+
+
+def test_criar_cadeia_segue_ordem_do_canal(cfg, tmp_path):
+    cfg.canais["teste"].visuais = ["flux", "pixabay"]
+    px, fx = Lote("pixabay", tmp_path), Lote("flux", tmp_path)
+    cadeia = criar_cadeia(cfg, cfg.canais["teste"], 1080, 1920, pixabay=px, flux=fx)
+    assert cadeia[:2] == [fx, px] and isinstance(cadeia[2], FundoProcedural) and len(cadeia) == 3
+
+
+def test_criar_cadeia_sem_provedores_so_procedural(cfg):
     cadeia = criar_cadeia(cfg, cfg.canais["teste"], 1080, 1920)
     assert [type(p) for p in cadeia] == [FundoProcedural]
-
-
-def test_criar_cadeia_so_pixabay(cfg):
-    cfg.chaves["PEXELS_API_KEY"] = "a"  # sobra de configurações antigas: ignorada
-    cfg.chaves["PIXABAY_API_KEY"] = "b"
-    cadeia = criar_cadeia(cfg, cfg.canais["teste"], 1080, 1920)
-    assert [type(p) for p in cadeia] == [PixabayImagens, FundoProcedural]

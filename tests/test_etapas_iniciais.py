@@ -313,7 +313,7 @@ def test_visuais_refazer_nao_repete_midias_anteriores(ctx, monkeypatch):
             caminho.write_bytes(b"x")
             return MidiaObtida(caminho, "imagem", "banco", url, "livre", "autor")
 
-    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a: [Banco()])
+    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a, **k: [Banco()])
     _segmentos(ctx, ["a b", "c d"])
     visuais.executar(ctx)
     primeira = [f["url"] for f in ler_json(ctx, "fontes_midia.json")]
