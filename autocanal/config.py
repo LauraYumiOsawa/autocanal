@@ -97,6 +97,7 @@ class ConfigFlux(BaseModel):
     vram_minima_gb: float = 7.0
     timeout_base_s: int = 180
     timeout_por_item_s: int = 45
+    variantes: int = 3  # imagens por trecho; a curadoria escolhe a melhor ou nenhuma
     sufixos: dict[str, str] = {
         "realista": "photorealistic photo, natural light, no text, no watermark",
         "desenho": "colorful 2D cartoon illustration, clean lines, flat shading, no text, "

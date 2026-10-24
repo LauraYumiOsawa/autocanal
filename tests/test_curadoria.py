@@ -99,3 +99,68 @@ def test_curadoria_nao_repete_candidato(tmp_path):
     cur, _ = _curadoria(tmp_path, MesmaPagina({}), lambda itens: {i.id: (1, "ok") for i in itens})
     r = cur.buscar_lote(_pedidos(tmp_path, ["a", "b"]), "retrato", set())
     assert list(r) == ["seg_01"]
+
+
+class GeradorFalso:
+    nome = "flux"
+
+    def __init__(self, gera=True, erro=False):
+        self.gera, self.erro, self.lotes = gera, erro, []
+
+    def buscar_lote(self, pedidos, orientacao, excluir):
+        self.lotes.append([p.id for p in pedidos])
+        if self.erro:
+            raise ErroProvedor("FLUX excedeu 180s")
+        saida = {}
+        for k, p in enumerate(pedidos if self.gera else []):
+            caminho = Path(str(p.destino_sem_ext) + ".png")
+            caminho.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (136, 77), (20 * k, 90, 160)).save(caminho)
+            saida[p.id] = MidiaObtida(caminho, "imagem", "flux", f"flux:{p.id}", "Apache",
+                                      "autocanal", prompt=f"prompt {p.id}")
+        return saida
+
+
+def test_flux_curado_gera_variantes_e_escolhe(tmp_path):
+    from autocanal.provedores.curadoria import FluxCurado
+    ger = GeradorFalso()
+    escolhidos = []
+
+    def escolher(itens):
+        escolhidos.extend((i.id, i.n) for i in itens)
+        return {"seg_01": (2, "mostra o roteador sem defeitos"), "seg_02": (0, "mãos erradas")}
+
+    cur = FluxCurado(ger, escolher, tmp_path / "flux_curadoria", variantes=3)
+    r = cur.buscar_lote(_pedidos(tmp_path, ["a", "b"]), "retrato", set())
+    assert ger.lotes == [["seg_01_v1", "seg_01_v2", "seg_01_v3", "seg_02_v1", "seg_02_v2", "seg_02_v3"]]
+    assert escolhidos == [("seg_01", 3), ("seg_02", 3)]
+    assert list(r) == ["seg_01"]
+    m = r["seg_01"]
+    assert m.caminho == tmp_path / "seg_01.png" and m.caminho.is_file()
+    assert (m.origem, m.url, m.prompt, m.motivo) == (
+        "flux", "flux:seg_01_v2", "prompt seg_01_v2", "mostra o roteador sem defeitos")
+    with Image.open(tmp_path / "flux_curadoria" / "seg_01.jpg") as im:
+        assert im.size == (1200, 600)
+
+
+def test_flux_curado_sem_variantes_nao_chama_claude(tmp_path):
+    from autocanal.provedores.curadoria import FluxCurado
+
+    def escolher(itens):
+        raise AssertionError("não deveria chamar o Claude")
+
+    cur = FluxCurado(GeradorFalso(gera=False), escolher, tmp_path / "fc")
+    assert cur.buscar_lote(_pedidos(tmp_path, ["a"]), "retrato", set()) == {}
+
+
+def test_flux_curado_erro_do_gerador_propaga(tmp_path):
+    from autocanal.provedores.curadoria import FluxCurado
+    cur = FluxCurado(GeradorFalso(erro=True), lambda itens: {}, tmp_path / "fc")
+    with pytest.raises(ErroProvedor):
+        cur.buscar_lote(_pedidos(tmp_path, ["a"]), "retrato", set())
+
+
+def test_prompt_curadoria_recusa_defeitos_de_ia():
+    texto = (Path(__file__).parents[1] / "autocanal" / "prompts" / "curadoria.md").read_text(
+        encoding="utf-8")
+    assert "dedos" in texto and "embaralhad" in texto

@@ -505,6 +505,8 @@ def test_visuais_libera_memoria_antes_do_flux(ctx, cfg, monkeypatch):
     cfg.canais["teste"].visuais = ["flux"]
     gerador = _FluxRegistra(eventos)
     monkeypatch.setattr(visuais, "GeradorFlux", gerador)
+    monkeypatch.setattr(visuais, "escolher_com_claude",
+                        lambda ctx: (lambda itens: {i.id: (1, "sem defeitos") for i in itens}))
     monkeypatch.setattr(mod_legendas, "liberar_modelos", lambda: eventos.append("whisper"))
     monkeypatch.setattr(servicos, "parar_kokoro", lambda raiz: eventos.append("kokoro"))
     _segmentos(ctx, ["a b", "c d"])
@@ -512,7 +514,10 @@ def test_visuais_libera_memoria_antes_do_flux(ctx, cfg, monkeypatch):
     assert eventos == ["whisper", "kokoro", "lote"]
     assert gerador.kw == {"job_id": ctx.job.id, "rodada": 0, "estilo_visual": "realista",
                           "estilo_ia": ""}
-    assert [f["origem"] for f in ler_json(ctx, "fontes_midia.json")] == ["flux", "flux"]
+    fontes = ler_json(ctx, "fontes_midia.json")
+    assert [f["origem"] for f in fontes] == ["flux", "flux"]
+    assert [f["motivo"] for f in fontes] == ["sem defeitos", "sem defeitos"]  # passou pela curadoria
+    assert [Path(f["caminho"]).name for f in fontes] == ["seg_01.png", "seg_02.png"]
 
 
 def test_visuais_flux_nao_instalado_segue(ctx, cfg, caplog):
@@ -531,6 +536,8 @@ def test_visuais_refeitos_atualizam_creditos_e_sintetico(ctx, cfg, monkeypatch):
     _instalar_flux_falso(cfg)
     cfg.canais["teste"].visuais = ["flux"]
     monkeypatch.setattr(visuais, "GeradorFlux", _FluxRegistra([]))
+    monkeypatch.setattr(visuais, "escolher_com_claude",
+                        lambda ctx: (lambda itens: {i.id: (1, "ok") for i in itens}))
     monkeypatch.setattr(mod_legendas, "liberar_modelos", lambda: None)
     monkeypatch.setattr(servicos, "parar_kokoro", lambda raiz: None)
     _segmentos(ctx, ["a b", "c d"])

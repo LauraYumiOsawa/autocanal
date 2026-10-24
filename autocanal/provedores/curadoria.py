@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -94,4 +95,54 @@ class CuradoriaPixabay:
                 continue
             usadas.add(c.pagina)
             obtidas[item.id] = dataclasses.replace(m, motivo=motivo)
+        return obtidas
+
+
+class FluxCurado:
+    """FLUX com controle de qualidade: `variantes` imagens por trecho num lote só, e a curadoria
+    escolhe a que mostra a fala sem defeitos (dedos a mais, texto embaralhado...) ou nenhuma."""
+
+    nome = "flux"
+
+    def __init__(self, gerador, escolher: Escolher, pasta: Path, variantes: int = 3):
+        self.gerador = gerador
+        self.escolher = escolher
+        self.pasta = pasta
+        self.variantes = variantes
+
+    def buscar_lote(
+        self, pedidos: list[Pedido], orientacao: Orientacao, excluir: set[str]
+    ) -> dict[str, MidiaObtida]:
+        self.pasta.mkdir(parents=True, exist_ok=True)
+        lote = [
+            dataclasses.replace(p, id=f"{p.id}_v{k}", destino_sem_ext=self.pasta / f"{p.id}_v{k}")
+            for p in pedidos
+            for k in range(1, self.variantes + 1)
+        ]
+        geradas = self.gerador.buscar_lote(lote, orientacao, excluir)
+        variantes: dict[str, list[MidiaObtida]] = {}
+        itens: list[ItemCuradoria] = []
+        for p in pedidos:
+            vs = [geradas[f"{p.id}_v{k}"] for k in range(1, self.variantes + 1)
+                  if f"{p.id}_v{k}" in geradas]
+            if not vs:
+                continue
+            folha = folha_contato([m.caminho for m in vs], ["imagem"] * len(vs),
+                                  self.pasta / f"{p.id}.jpg")
+            variantes[p.id] = vs
+            itens.append(ItemCuradoria(p.id, p.texto, p.cena, folha, len(vs)))
+        escolhas: dict[str, tuple[int, str]] = {}
+        for i in range(0, len(itens), LOTE):
+            escolhas.update(self.escolher(itens[i:i + LOTE]))
+
+        destinos = {p.id: p.destino_sem_ext for p in pedidos}
+        obtidas: dict[str, MidiaObtida] = {}
+        for item in itens:
+            indice, motivo = escolhas.get(item.id, (0, ""))
+            if not 1 <= indice <= item.n:
+                continue
+            m = variantes[item.id][indice - 1]
+            destino = Path(str(destinos[item.id]) + m.caminho.suffix)
+            shutil.copyfile(m.caminho, destino)
+            obtidas[item.id] = dataclasses.replace(m, caminho=destino, motivo=motivo)
         return obtidas

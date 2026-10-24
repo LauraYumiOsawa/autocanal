@@ -10,7 +10,7 @@ from autocanal.claude import ErroClaude, ErroClaudeIndisponivel, LimiteUsoClaude
 from autocanal.etapas.base import Contexto, ErroEtapa, carregar_prompt, gravar_json, ler_json
 from autocanal.etapas.metadados import atualizar_creditos
 from autocanal.provedores import flux
-from autocanal.provedores.curadoria import CuradoriaPixabay, Escolher, ItemCuradoria
+from autocanal.provedores.curadoria import CuradoriaPixabay, Escolher, FluxCurado, ItemCuradoria
 from autocanal.provedores.flux import GeradorFlux
 from autocanal.provedores.imagens import Pedido, PixabayCandidatos, criar_cadeia, resolver
 
@@ -96,9 +96,11 @@ def executar(ctx: Contexto) -> None:
     if "flux" in ctx.canal.visuais:
         if flux.instalado(ctx.cfg):
             flux.preparar_memoria(ctx.cfg.raiz)
-            gerador = GeradorFlux(ctx.cfg, job_id=ctx.job.id, rodada=ctx.job.tentativas_revisao,
-                                  estilo_visual=ctx.canal.estilo_visual,
-                                  estilo_ia=ctx.canal.estilo_ia)
+            gerador = FluxCurado(
+                GeradorFlux(ctx.cfg, job_id=ctx.job.id, rodada=ctx.job.tentativas_revisao,
+                            estilo_visual=ctx.canal.estilo_visual, estilo_ia=ctx.canal.estilo_ia),
+                escolher_com_claude(ctx), pasta / "curadoria_flux", ctx.cfg.flux.variantes,
+            )
         else:
             log.warning("o canal %s pede FLUX, mas servicos/flux não está instalado",
                         ctx.canal.slug)

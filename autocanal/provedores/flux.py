@@ -74,10 +74,16 @@ def prompt_final(cena: str, estilo_ia: str, sufixo: str) -> str:
     return ", ".join(p.strip() for p in (cena, estilo_ia, sufixo) if p and p.strip())
 
 
-def semente(job_id: str, item_id: str, rodada: int) -> int:
-    """Determinística por trecho e rodada de revisão: refazer os visuais gera imagens novas."""
-    digest = hashlib.sha256(f"{job_id}|{item_id}|{rodada}".encode()).digest()
+def semente(job_id: str, item_id: str, rodada: int, tentativa: int = 0) -> int:
+    """Determinística por trecho e rodada de revisão: refazer os visuais gera imagens novas.
+    `tentativa` pula sementes cujas imagens já foram usadas (ex.: refazer da quarentena)."""
+    chave = f"{job_id}|{item_id}|{rodada}" + (f"|{tentativa}" if tentativa else "")
+    digest = hashlib.sha256(chave.encode()).digest()
     return int.from_bytes(digest[:4], "big") & 0x7FFFFFFF
+
+
+def _url(prompt: str, semente_: int) -> str:
+    return "flux:" + hashlib.sha256(f"{prompt}|{semente_}".encode()).hexdigest()[:8]
 
 
 class GeradorFlux:
@@ -123,11 +129,14 @@ class GeradorFlux:
         (lote / "saida").mkdir(parents=True)
         largura, altura = (f.largura, f.altura) if orientacao == "paisagem" else (f.altura, f.largura)
         sufixo = f.sufixos.get(self.estilo_visual, "")
-        itens = [
-            {"id": p.id, "prompt": prompt_final(p.cena or p.consulta, self.estilo_ia, sufixo),
-             "semente": semente(self.job_id, p.id, self.rodada)}
-            for p in pedidos
-        ]
+        itens = []
+        for p in pedidos:
+            prompt = prompt_final(p.cena or p.consulta, self.estilo_ia, sufixo)
+            tentativa = 0
+            while _url(prompt, semente(self.job_id, p.id, self.rodada, tentativa)) in excluir:
+                tentativa += 1
+            itens.append({"id": p.id, "prompt": prompt,
+                          "semente": semente(self.job_id, p.id, self.rodada, tentativa)})
         entrada = lote / "entrada.json"
         entrada.write_text(json.dumps(
             {"largura": largura, "altura": altura, "passos": f.passos, "itens": itens},
@@ -162,7 +171,7 @@ class GeradorFlux:
             destino = Path(str(destinos[pid]) + ".png")
             shutil.move(png, destino)
             pedido = por_id[pid]
-            marca = hashlib.sha256(f"{pedido['prompt']}|{pedido['semente']}".encode()).hexdigest()
-            obtidas[pid] = MidiaObtida(destino, "imagem", "flux", f"flux:{marca[:8]}", LICENCA,
+            obtidas[pid] = MidiaObtida(destino, "imagem", "flux",
+                                       _url(pedido["prompt"], pedido["semente"]), LICENCA,
                                        "autocanal", prompt=pedido["prompt"])
         return obtidas

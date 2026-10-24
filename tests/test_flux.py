@@ -121,3 +121,14 @@ def test_timeout_mata_o_grupo_inteiro(cfg, tmp_path):
             break
         time.sleep(0.1)
     assert _estado(pid) in (None, "Z")
+
+
+def test_semente_pula_imagens_ja_usadas(cfg, tmp_path):
+    # refazer da quarentena zera a rodada: sem isso o FLUX repetiria a imagem reprovada
+    primeira = _gerador(cfg).buscar_lote(_pedidos(tmp_path, ["a router"]), "paisagem", set())
+    url = primeira["seg_01"].url
+    entrada1 = json.loads((tmp_path / "visuais" / "flux_lote" / "entrada.json").read_text())
+    segunda = _gerador(cfg).buscar_lote(_pedidos(tmp_path, ["a router"]), "paisagem", {url})
+    entrada2 = json.loads((tmp_path / "visuais" / "flux_lote" / "entrada.json").read_text())
+    assert segunda["seg_01"].url != url
+    assert entrada1["itens"][0]["semente"] != entrada2["itens"][0]["semente"]
