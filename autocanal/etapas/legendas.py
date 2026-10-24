@@ -4,10 +4,7 @@ from __future__ import annotations
 import json
 
 from autocanal.etapas.base import Contexto, ErroEtapa, gravar_json
-from autocanal.legendas import agrupar, alinhar, gerar_ass, transcrever
-
-TAMANHO = 88
-MARGEM_V = 560
+from autocanal.legendas import agrupar, alinhar, gerar_ass, largura_util, medidor, transcrever
 
 
 def executar(ctx: Contexto) -> None:
@@ -41,14 +38,21 @@ def executar(ctx: Contexto) -> None:
     if not alinhadas:
         raise ErroEtapa("roteiro sem palavras para legendar")
     fmt, canal = ctx.formato, ctx.canal
+    blocos = agrupar(
+        alinhadas,
+        fmt.legenda_max_palavras,
+        fmt.legenda_max_duracao_s,
+        largura_max=largura_util(fmt.largura),
+        medir=medidor(canal.fonte_arquivo, fmt.legenda_tamanho),
+    )
     gerar_ass(
-        agrupar(alinhadas),
+        blocos,
         ctx.pasta / "legendas.ass",
         largura=fmt.largura,
         altura=fmt.altura,
         fonte_nome=canal.fonte_nome,
-        tamanho=TAMANHO,
+        tamanho=fmt.legenda_tamanho,
         cor_texto=canal.paleta.texto,
         cor_destaque=canal.paleta.destaque,
-        margem_v=MARGEM_V,
+        margem_v=fmt.legenda_margem_v,
     )

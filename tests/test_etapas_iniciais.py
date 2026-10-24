@@ -255,6 +255,34 @@ def test_legendas_usa_transcricao(ctx, cfg, monkeypatch):
     assert "OLÁ, MUNDO." in ass and "TUDO BEM?" in ass  # texto do roteiro, não do Whisper
 
 
+def test_legendas_ass_usa_formato(cfg, con, monkeypatch):
+    job = fila.criar_job(con, "teste", "medio", "por que o mar é salgado", PUBLICAR)
+    c = contexto_para(cfg, con, job)
+    TTSFalso().sintetizar("um dois", c.pasta / "narracao.wav")
+    _segmentos(c, ["Olá, mundo."])
+    monkeypatch.setattr(legendas, "transcrever", lambda wav, **kw: [
+        Palavra("Olá", 0.0, 0.3), Palavra("mundo.", 0.35, 0.7)])
+    legendas.executar(c)
+    ass = (c.pasta / "legendas.ass").read_text(encoding="utf-8")
+    assert "PlayResX: 1920" in ass and "PlayResY: 1080" in ass
+    assert "Style: Legenda,DejaVu Sans,60," in ass
+    assert ass.split("Style: Legenda", 1)[1].splitlines()[0].endswith(",60,60,70,1")
+
+
+def test_legendas_short_quebra_linha_larga(ctx, monkeypatch):
+    # prova real de 2026-10-23: "VELOCIDADE NUM COMPUTADOR" em 88 px passava das bordas
+    TTSFalso().sintetizar("um dois três", ctx.pasta / "narracao.wav")
+    _segmentos(ctx, ["velocidade num computador"])
+    monkeypatch.setattr(legendas, "transcrever", lambda wav, **kw: [
+        Palavra("velocidade", 0.0, 0.4), Palavra("num", 0.45, 0.6),
+        Palavra("computador", 0.65, 1.1)])
+    legendas.executar(ctx)
+    falas = [linha.rsplit(",", 1)[1] for linha in
+             (ctx.pasta / "legendas.ass").read_text(encoding="utf-8").splitlines()
+             if linha.startswith("Dialogue:")]
+    assert "COMPUTADOR" in falas and "VELOCIDADE NUM COMPUTADOR" not in falas
+
+
 def test_legendas_sem_roteiro_falha(ctx, monkeypatch):
     TTSFalso().sintetizar("um", ctx.pasta / "narracao.wav")
     monkeypatch.setattr(legendas, "transcrever", lambda wav, **kw: [Palavra("um", 0.0, 0.3)])
