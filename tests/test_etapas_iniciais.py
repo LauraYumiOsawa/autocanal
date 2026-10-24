@@ -334,3 +334,82 @@ def test_visuais_um_por_segmento_sem_repetir(ctx):
     assert arquivos == ["seg_01.png", "seg_02.png", "seg_03.png"]
     assert [Path(f["caminho"]).name for f in fontes] == arquivos
     assert all(f["licenca"] and f["origem"] for f in fontes)
+
+
+def _itens_curadoria(ctx, n=1):
+    from PIL import Image
+
+    from autocanal.provedores.curadoria import ItemCuradoria
+    folha = ctx.pasta / "visuais" / "curadoria" / "seg_01.jpg"
+    folha.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (1200, 600)).save(folha)
+    return [ItemCuradoria("seg_01", "o roteador do vizinho", "a router on a shelf", folha, n)]
+
+
+def test_escolher_com_claude_usa_modelo_e_read(ctx, cfg, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    claude_falso.responder(_ok({"escolhas": [{"id": "seg_01", "candidato": 2, "motivo": "roteador"}]}))
+    itens = _itens_curadoria(ctx, n=3)
+    assert visuais.escolher_com_claude(ctx)(itens) == {"seg_01": (2, "roteador")}
+    argv = claude_falso.chamadas()[-1]
+    assert argv[argv.index("--model") + 1] == "sonnet"
+    assert argv[argv.index("--allowedTools") + 1:] == ["Read"]
+    assert argv[argv.index("--max-turns") + 1] == "25"
+    prompt = argv[2]
+    assert "o roteador do vizinho" in prompt and "a router on a shelf" in prompt
+    assert str(itens[0].folha) in prompt
+    n = ctx.con.execute("SELECT COUNT(*) FROM chamadas_claude WHERE job_id = ? AND etapa = 'visuais'",
+                        (ctx.job.id,)).fetchone()[0]
+    assert n == 1
+
+
+def test_escolher_erro_claude_vira_erro_etapa(ctx, cfg, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    claude_falso.responder({"type": "result", "subtype": "error_max_turns", "is_error": True,
+                            "result": "acabaram os turnos"})
+    with pytest.raises(ErroEtapa, match="curadoria"):
+        visuais.escolher_com_claude(ctx)(_itens_curadoria(ctx))
+
+
+def test_escolher_limite_uso_propaga(ctx, cfg, claude_falso):
+    from autocanal.claude import LimiteUsoClaude
+    cfg.claude.bin = claude_falso.claude_bin
+    claude_falso.responder({"type": "result", "subtype": "success", "is_error": True,
+                            "result": "You've hit your session limit · resets 5am"})
+    with pytest.raises(LimiteUsoClaude):
+        visuais.escolher_com_claude(ctx)(_itens_curadoria(ctx))
+
+
+def test_visuais_usa_curadoria_com_chave(ctx, cfg, monkeypatch):
+    from PIL import Image
+
+    from autocanal.provedores.imagens import Candidato, MidiaObtida
+
+    class Fonte:
+        def __init__(self, chave):
+            assert chave == "k"
+
+        def buscar(self, consulta, orientacao, estilo, excluir, maximo=6):
+            assert estilo == "realista"
+            return [Candidato("imagem", f"https://pixabay.com/{consulta}", "p", "d", "Ana")]
+
+        def baixar_preview(self, c, destino):
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (64, 36)).save(destino, format="JPEG")
+            return destino
+
+        def baixar(self, c, destino_sem_ext):
+            caminho = Path(str(destino_sem_ext) + ".jpg")
+            caminho.write_bytes(b"x")
+            return MidiaObtida(caminho, "imagem", "pixabay", c.pagina, "Pixabay Content License", "Ana")
+
+    cfg.chaves["PIXABAY_API_KEY"] = "k"
+    monkeypatch.setattr(visuais, "PixabayCandidatos", Fonte)
+    monkeypatch.setattr(visuais, "escolher_com_claude",
+                        lambda ctx: (lambda itens: {i.id: (1, "combina") for i in itens}))
+    _segmentos(ctx, ["a b", "c d"], ["ocean", "city"])
+    visuais.executar(ctx)
+    fontes = ler_json(ctx, "fontes_midia.json")
+    assert [f["origem"] for f in fontes] == ["pixabay", "pixabay"]
+    assert [f["motivo"] for f in fontes] == ["combina", "combina"]
+    assert (ctx.pasta / "visuais" / "curadoria" / "seg_01.jpg").exists()

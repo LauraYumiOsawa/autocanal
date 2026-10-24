@@ -25,8 +25,8 @@ client_secret: config/client_secret.json
 kokoro_url: http://127.0.0.1:8880
 claude:
   bin: claude
-  modelos: {{roteiro: null, metadados: sonnet, revisao: null, temas: sonnet}}
-  max_turns: {{roteiro: 30, metadados: 20, revisao: 30, temas: 15}}
+  modelos: {{roteiro: null, metadados: sonnet, revisao: null, temas: sonnet, curadoria: sonnet}}
+  max_turns: {{roteiro: 30, metadados: 20, revisao: 30, temas: 15, curadoria: 25}}
 """,
         encoding="utf-8",
     )

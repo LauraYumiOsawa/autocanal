@@ -152,6 +152,10 @@ def checagens(ctx: Contexto) -> list[tuple[str, str]]:
             f"mídia sem origem ou licença registrada nos segmentos {', '.join(sem_registro)}",
             "visuais",
         ))
+    for i, f in enumerate(fontes, 1):
+        if f.get("origem") == "procedural":
+            problemas.append((f"trecho {i} sem imagem relacionada à fala (fundo procedural)",
+                              "visuais"))
 
     texto = _texto_roteiro(roteiro)
     maior, parecido = max(

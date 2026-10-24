@@ -186,6 +186,12 @@ def _midia_faltando(ctx, cfg, con, videos):
     gravar_json(ctx, "fontes_midia.json", ler_json(ctx, "fontes_midia.json")[:3])
 
 
+def _midia_procedural(ctx, cfg, con, videos):
+    fontes = ler_json(ctx, "fontes_midia.json")
+    fontes[1].update(origem="procedural", licenca="gerado localmente", url="procedural:abc")
+    gravar_json(ctx, "fontes_midia.json", fontes)
+
+
 def _roteiro_repetido(ctx, cfg, con, videos):
     _outro_job(cfg, con, "teste", _roteiro())
 
@@ -198,6 +204,7 @@ def _roteiro_repetido(ctx, cfg, con, videos):
     (_titulo_fraco, "nota 62", ["metadados"]),
     (_midia_sem_licenca, "licença", ["visuais"]),
     (_midia_faltando, "3 mídias para 4 segmentos", ["visuais"]),
+    (_midia_procedural, "trecho 2 sem imagem relacionada à fala", ["visuais"]),
     (_roteiro_repetido, "parecido", ["roteiro"]),
 ])
 def test_checagens_mapeiam_etapa(ctx, cfg, con, videos, mudar, trecho, etapas_esperadas):
