@@ -55,6 +55,7 @@ def test_short_offline_gera_mp4_valido(cfg, claude_falso, monkeypatch):
     claude_falso.responder(
         _ok(_roteiro()),
         _ok({"titulo": "Por que o mar é salgado? 3 motivos", "texto_thumb": "SAL ESCONDIDO",
+             "cena_thumb": "salt crystals on a dark rock by the sea at dusk",
              "descricao": "Resumo do vídeo.", "tags": ["mar", "ciência"],
              "consultas_alvo": ["por que o mar é salgado", "sal do mar", "água do mar"]}),
         _ok({"aprovado": True, "nota": 90, "problemas": [], "etapa_para_refazer": None,

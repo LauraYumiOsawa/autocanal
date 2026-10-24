@@ -235,7 +235,8 @@ def executar(ctx: Contexto) -> None:
     ctx.con.commit()
     if aprovado:
         meta = ler_json(ctx, "metadados.json")
-        meta["sintetico"] = resultado["contains_synthetic_media"]
+        # a revisão pode ligar a marcação de mídia sintética, nunca desligar (ex.: imagens do FLUX)
+        meta["sintetico"] = bool(meta.get("sintetico")) or resultado["contains_synthetic_media"]
         gravar_json(ctx, "metadados.json", meta)
         novo = Estado.APROVADO
     elif rodada >= ctx.cfg.revisao.max_rodadas:

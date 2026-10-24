@@ -382,3 +382,12 @@ def test_revisor_pede_metadados_junto_com_visuais(ctx, cfg, con, claude_falso):
     assert [fila.estado_etapa(con, j.id, n) for n in ETAPAS] == [
         "ok", "ok", "ok", None, None, None, None]
     assert ler_json(ctx, "revisao_1.json")["refazer_metadados"] is True
+
+
+def test_revisao_nao_desliga_sintetico(ctx, cfg, con, claude_falso):
+    cfg.claude.bin = claude_falso.claude_bin
+    meta = ler_json(ctx, "metadados.json")
+    gravar_json(ctx, "metadados.json", {**meta, "sintetico": True})  # mídia do FLUX
+    claude_falso.responder(_parecer(True, sintetico=False))
+    revisao.executar(ctx)
+    assert ler_json(ctx, "metadados.json")["sintetico"] is True
