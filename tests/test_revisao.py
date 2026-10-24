@@ -427,3 +427,11 @@ def test_revisao_thumbnail_certa_sem_problema(ctx):
 
 def test_schema_revisor_aceita_thumbnail():
     assert "thumbnail" in revisao.REVISAO["properties"]["etapa_para_refazer"]["enum"]
+
+
+def test_schema_revisor_tem_trechos_visuais():
+    campo = revisao.REVISAO["properties"]["trechos_visuais"]
+    assert campo["type"] == "array" and campo["items"]["minimum"] == 1
+    texto = (Path(__file__).parents[1] / "autocanal" / "prompts" / "revisao.md").read_text(
+        encoding="utf-8")
+    assert "`trechos_visuais`" in texto

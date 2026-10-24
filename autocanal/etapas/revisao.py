@@ -49,6 +49,8 @@ REVISAO = {
         },
         "refazer_metadados": {"type": "boolean"},
         "contains_synthetic_media": {"type": "boolean"},
+        # segmentos (1 = primeiro) cujo visual deve ser refeito; os outros são mantidos
+        "trechos_visuais": {"type": "array", "items": {"type": "integer", "minimum": 1}},
     },
 }
 

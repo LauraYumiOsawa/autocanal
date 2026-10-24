@@ -128,23 +128,30 @@ def executar(ctx: Contexto) -> None:
 def _a_manter(ctx: Contexto, anteriores: list[dict], n_segmentos: int) -> dict[int, dict]:
     """Visuais aprovados da rodada anterior que continuam valendo.
 
-    Só quando a reprovação veio das checagens automáticas (fundo procedural): aí o Claude não
-    julgou os visuais e refazer tudo jogaria fora as escolhas boas. Se o revisor reprovou, ou se o
-    roteiro foi reescrito depois dos visuais, tudo é refeito.
+    Reprovação das checagens automáticas (fundo procedural): ficam todos os não procedurais.
+    Reprovação do revisor: ficam os que ele não apontou em `trechos_visuais` (sem a lista, tudo é
+    refeito). Roteiro reescrito depois dos visuais: tudo é refeito.
     """
     rodadas = sorted(ctx.pasta.glob("revisao_*.json"),
                      key=lambda a: int(a.stem.split("_")[1]) if a.stem.split("_")[1].isdigit() else 0)
     if not rodadas or len(anteriores) != n_segmentos:
         return {}
     try:
-        origem = json.loads(rodadas[-1].read_text(encoding="utf-8")).get("origem")
+        ultima = json.loads(rodadas[-1].read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     roteiro, fontes = ctx.pasta / "roteiro.json", ctx.pasta / "fontes_midia.json"
-    if origem != "checagens" or roteiro.stat().st_mtime > fontes.stat().st_mtime:
+    if roteiro.stat().st_mtime > fontes.stat().st_mtime:
+        return {}
+    if ultima.get("origem") == "checagens":
+        refazer: set[int] = set()
+    elif ultima.get("origem") == "revisor" and ultima.get("trechos_visuais"):
+        refazer = {int(n) for n in ultima["trechos_visuais"]}
+    else:
         return {}
     return {i: f for i, f in enumerate(anteriores, 1)
-            if f.get("origem") != "procedural" and Path(f.get("caminho", "")).is_file()}
+            if i not in refazer and f.get("origem") != "procedural"
+            and Path(f.get("caminho", "")).is_file()}
 
 
 def _guardar(ctx: Contexto, mantidas: dict[int, dict]) -> dict[int, dict]:

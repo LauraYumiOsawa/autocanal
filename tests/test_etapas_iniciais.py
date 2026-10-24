@@ -634,3 +634,25 @@ def test_visuais_roteiro_reescrito_refaz_tudo(ctx, monkeypatch):
     monkeypatch.setattr(visuais, "criar_cadeia", lambda *a, **k: [banco])
     visuais.executar(ctx)
     assert banco.pedidos == [["seg_01", "seg_02"]]
+
+
+def test_visuais_refazem_so_os_trechos_apontados_pelo_revisor(ctx, monkeypatch):
+    # prova real: o revisor reprovou 2 de 12 visuais, refazer os 12 fez 3 outros falharem
+    _segmentos(ctx, ["a b", "c d", "e f"])
+    fontes = []
+    for i in (1, 2, 3):
+        arq = ctx.pasta / "visuais" / f"seg_{i:02d}.png"
+        arq.parent.mkdir(parents=True, exist_ok=True)
+        arq.write_bytes(b"bom")
+        fontes.append({"caminho": str(arq), "tipo": "imagem", "origem": "flux",
+                       "url": f"flux:{i}", "licenca": "x", "autor": "y"})
+    gravar_json(ctx, "fontes_midia.json", fontes)
+    gravar_json(ctx, "revisao_1.json", {"origem": "revisor", "aprovado": False,
+                                        "problemas": ["seg 2 com quatro mãos"],
+                                        "trechos_visuais": [2]})
+    banco = _BancoNovo()
+    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a, **k: [banco])
+    visuais.executar(ctx)
+    assert banco.pedidos == [["seg_02"]]
+    assert [f["url"] for f in ler_json(ctx, "fontes_midia.json")] == [
+        "flux:1", "flux:novo-seg_02", "flux:3"]

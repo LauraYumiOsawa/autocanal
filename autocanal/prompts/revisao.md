@@ -40,3 +40,4 @@ Formato: {formato}
 - `etapa_para_refazer`: a etapa mais cedo que resolve todos os problemas: `roteiro` (texto, fatos, fontes, variação), `narracao` (a voz pulou ou trocou trechos), `legendas` (texto ou tempo das legendas queimadas errado), `visuais` (imagens impróprias ou que não combinam com a fala), `render` (montagem, áudio), `metadados` (título, texto da thumbnail, descrição, tags, capítulos) ou `thumbnail` (só a imagem da thumbnail do vídeo médio); `null` se aprovado.
 - `refazer_metadados`: `true` se algum problema for de título, thumbnail, descrição, tags ou capítulos, mesmo quando `etapa_para_refazer` for outra etapa; `false` se aprovado.
 - `contains_synthetic_media`: a decisão do item 6.
+- `trechos_visuais`: os números dos segmentos (1 = o primeiro do roteiro) cujo visual precisa ser refeito; os outros visuais são mantidos. Lista vazia se nenhum visual tiver problema; se o problema for o conjunto dos visuais (estilo misturado, por exemplo), liste todos.
