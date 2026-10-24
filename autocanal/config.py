@@ -114,6 +114,7 @@ class Config(BaseModel):
     plugin_dir: Path
     client_secret: Path
     kokoro_url: str
+    kokoro_timeout_s: int = 600  # o contêiner leva ~4 min para carregar o modelo na CPU
     claude: ConfigClaude
     whisper: ConfigWhisper = ConfigWhisper()
     revisao: ConfigRevisao = ConfigRevisao()

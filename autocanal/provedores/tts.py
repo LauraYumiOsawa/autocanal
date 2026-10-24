@@ -146,7 +146,8 @@ class _KokoroGerenciado(KokoroTTS):
     def sintetizar(self, texto: str, destino: Path) -> Path:
         if not self._pronto:
             servicos.garantir(
-                "kokoro", self._cfg.raiz, f"{self._cfg.kokoro_url.rstrip('/')}/health"
+                "kokoro", self._cfg.raiz, f"{self._cfg.kokoro_url.rstrip('/')}/health",
+                timeout_s=self._cfg.kokoro_timeout_s,
             )
             self._pronto = True
         return super().sintetizar(texto, destino)
