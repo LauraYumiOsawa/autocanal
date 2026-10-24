@@ -163,10 +163,11 @@ def publicar_aprovados(
         _agendar(con, job.id, video_id)
         enviados.append(video_id)
         _somar_cota(con, agora, CUSTO_UPLOAD)
-        thumb = pasta / "thumbnail.png"
+        thumb = pasta / "thumbnail.jpg"
         if job.formato != "short" and thumb.is_file():
             try:
                 upload.definir_thumbnail(yt, video_id, thumb)
+                _registrar_thumbnail(pasta, True, "")
             except oauth.AuthExpirada as e:
                 _auth_off(con, job.canal, str(e))
                 canais_off.add(job.canal)
@@ -174,8 +175,16 @@ def publicar_aprovados(
                 if _tratar_cota(cfg, e, job.canal, canais_off, relogio()):
                     return enviados
             except upload.ErroUpload as e:
+                # típico: canal sem verificação por telefone (youtube.com/verify)
                 log.warning("thumbnail de %s não enviada: %s", job.id, e)
+                _registrar_thumbnail(pasta, False, str(e))
     return enviados
+
+
+def _registrar_thumbnail(pasta: Path, ok: bool, erro: str) -> None:
+    (pasta / "thumbnail_envio.json").write_text(
+        json.dumps({"ok": ok, "erro": erro[:200]}, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def _falhar_youtube(con, job, detalhe: str) -> None:

@@ -3,7 +3,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from autocanal.etapas import legendas, metadados, narracao, render, revisao, roteiro, visuais
+from autocanal.etapas import (
+    legendas,
+    metadados,
+    narracao,
+    render,
+    revisao,
+    roteiro,
+    thumbnail,
+    visuais,
+)
 from autocanal.etapas.base import Contexto
 
 REGISTRO: dict[str, Callable[[Contexto], None]] = {
@@ -13,5 +22,6 @@ REGISTRO: dict[str, Callable[[Contexto], None]] = {
     "visuais": visuais.executar,
     "render": render.executar,
     "metadados": metadados.executar,
+    "thumbnail": thumbnail.executar,
     "revisao": revisao.executar,
 }

@@ -4,6 +4,9 @@ from __future__ import annotations
 import json
 import re
 from datetime import UTC, datetime
+from pathlib import Path
+
+from PIL import Image
 
 from autocanal import claude, fila
 from autocanal.etapas.base import (
@@ -40,7 +43,8 @@ REVISAO = {
         "problemas": {"type": "array", "items": {"type": "string"}},
         "etapa_para_refazer": {
             "type": ["string", "null"],
-            "enum": ["roteiro", "narracao", "legendas", "visuais", "render", "metadados", None],
+            "enum": ["roteiro", "narracao", "legendas", "visuais", "render", "metadados",
+                     "thumbnail", None],
         },
         "refazer_metadados": {"type": "boolean"},
         "contains_synthetic_media": {"type": "boolean"},
@@ -116,6 +120,18 @@ def _checar_video(ctx: Contexto) -> list[tuple[str, str]]:
     return problemas
 
 
+def _checar_thumbnail(arq: Path) -> list[tuple[str, str]]:
+    if not arq.exists():
+        return [("thumbnail ausente (thumbnail.jpg)", "thumbnail")]
+    with Image.open(arq) as im:
+        tamanho = im.size
+    if tamanho != (1280, 720):
+        return [(f"thumbnail com {tamanho[0]}×{tamanho[1]} (esperado 1280×720)", "thumbnail")]
+    if arq.stat().st_size >= 2_000_000:
+        return [(f"thumbnail com {arq.stat().st_size} bytes (máximo 2 MB)", "thumbnail")]
+    return []
+
+
 def checagens(ctx: Contexto) -> list[tuple[str, str]]:
     """Problemas determinísticos, cada um com a etapa que o resolve."""
     rev = ctx.cfg.revisao
@@ -156,6 +172,9 @@ def checagens(ctx: Contexto) -> list[tuple[str, str]]:
         if f.get("origem") == "procedural":
             problemas.append((f"trecho {i} sem imagem relacionada à fala (fundo procedural)",
                               "visuais"))
+
+    if "thumbnail" in ctx.formato.etapas:
+        problemas.extend(_checar_thumbnail(ctx.pasta / "thumbnail.jpg"))
 
     texto = _texto_roteiro(roteiro)
     maior, parecido = max(

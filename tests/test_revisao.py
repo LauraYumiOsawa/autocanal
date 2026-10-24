@@ -391,3 +391,32 @@ def test_revisao_nao_desliga_sintetico(ctx, cfg, con, claude_falso):
     claude_falso.responder(_parecer(True, sintetico=False))
     revisao.executar(ctx)
     assert ler_json(ctx, "metadados.json")["sintetico"] is True
+
+
+@pytest.mark.parametrize("tamanho, esperado", [((640, 360), "640×360"), (None, "ausente")])
+def test_revisao_reprova_thumbnail_errada(ctx, tamanho, esperado):
+    import dataclasses
+
+    from PIL import Image
+
+    from autocanal.formatos import FORMATOS
+    medio = dataclasses.replace(ctx, formato=FORMATOS["medio"])
+    if tamanho:
+        Image.new("RGB", tamanho).save(medio.pasta / "thumbnail.jpg")
+    problemas = [(p, e) for p, e in revisao.checagens(medio) if e == "thumbnail"]
+    assert len(problemas) == 1 and esperado in problemas[0][0]
+
+
+def test_revisao_thumbnail_certa_sem_problema(ctx):
+    import dataclasses
+
+    from PIL import Image
+
+    from autocanal.formatos import FORMATOS
+    medio = dataclasses.replace(ctx, formato=FORMATOS["medio"])
+    Image.new("RGB", (1280, 720)).save(medio.pasta / "thumbnail.jpg")
+    assert [e for _, e in revisao.checagens(medio) if e == "thumbnail"] == []
+
+
+def test_schema_revisor_aceita_thumbnail():
+    assert "thumbnail" in revisao.REVISAO["properties"]["etapa_para_refazer"]["enum"]
