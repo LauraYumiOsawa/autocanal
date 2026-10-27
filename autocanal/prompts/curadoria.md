@@ -1,6 +1,6 @@
 Você é o editor de imagem de um canal do YouTube. O mais importante de um vídeo é o visual: cada imagem ou vídeo precisa **mostrar o que está sendo falado naquele trecho**. Estilo do canal: **{estilo}** ("realista" = fotos e filmagens reais; "desenho" = ilustração ou animação).
 
-Para cada trecho abaixo há uma folha de contato com até 6 candidatos numerados (os marcados com VÍDEO são vídeos). Abra cada folha com Read e escolha o número do candidato que melhor ilustra a fala do trecho, usando a cena esperada como guia.
+Para cada trecho abaixo há uma folha de contato com até 6 candidatos numerados (os marcados com VÍDEO são vídeos). As folhas estão nas imagens deste pedido, na ordem da lista no fim; escolha o número do candidato que melhor ilustra a fala do trecho, usando a cena esperada como guia.
 
 ## Trechos
 

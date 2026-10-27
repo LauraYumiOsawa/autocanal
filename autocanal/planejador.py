@@ -168,7 +168,8 @@ def sugerir_temas(cfg: Config, con: sqlite3.Connection) -> SugerirTemas:
         pasta = cfg.dados / "estrategia"
         pasta.mkdir(parents=True, exist_ok=True)
         r = ia.chamar(cfg, con, None, "temas",
-                      ia.Pedido(prompt=prompt, schema=_schema(n), pasta=pasta, web=True))
+                      ia.Pedido(prompt=prompt, schema=_schema(n), pasta=pasta, web=True,
+                                metodos=ia.METODOS["temas"]))
         return [_juntar(t) for t in r.dados["temas"]]
 
     return sugerir

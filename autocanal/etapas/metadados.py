@@ -146,10 +146,10 @@ def executar(ctx: Contexto) -> None:
         perfil_voz=perfil_voz(ctx),
         titulos_recentes=lista_md(titulos_recentes(ctx), "(nenhum ainda)"),
         problemas_anteriores=lista_md(problemas_revisao(ctx), "Nenhum: esta é a primeira versão."),
-        dir_plugin=ctx.cfg.plugin_dir,
     )
     r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, "metadados",
-                  ia.Pedido(prompt=prompt, schema=METADADOS, pasta=ctx.pasta))
+                  ia.Pedido(prompt=prompt, schema=METADADOS, pasta=ctx.pasta,
+                            metodos=ia.METODOS["metadados"], scripts=ia.SCRIPTS["metadados"]))
     d = r.dados
     titulo = sanitizar_texto(d["titulo"]).strip()
     if not titulo:

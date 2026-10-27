@@ -18,13 +18,25 @@ from autocanal.ia.base import (
 )
 
 __all__ = [
-    "ADAPTADORES", "Capacidades", "ErroIA", "IAIndisponivel", "LimiteUso", "PAUSA", "Pedido",
-    "Resultado", "chamar", "livre", "pausa", "pausar", "pausas", "provedor_de",
+    "ADAPTADORES", "Capacidades", "ErroIA", "IAIndisponivel", "LimiteUso", "METODOS", "PAUSA",
+    "Pedido", "Resultado", "SCRIPTS", "chamar", "livre", "pausa", "pausar", "pausas",
+    "provedor_de",
 ]
 
 ADAPTADORES: dict[str, ModuleType] = {claude_cli.NOME: claude_cli}
 PAUSA = timedelta(hours=1)
 MAX_TURNS_PADRAO = 20
+# skills do plugin que cada etapa segue como método (copiadas para <pasta>/metodo/)
+METODOS: dict[str, tuple[str, ...]] = {
+    "roteiro": ("yt-script",),
+    "metadados": ("yt-package", "yt-seo", "yt-chapters"),
+    "temas": ("yt-plan",),
+}
+# únicos comandos que a IA da etapa pode rodar (relativos à pasta)
+SCRIPTS: dict[str, tuple[str, ...]] = {
+    "roteiro": ("metodo/yt-script/hookscore.py",),
+    "metadados": ("metodo/yt-package/title.py",),
+}
 
 
 def provedor_de(cfg: Config, etapa: str) -> str:

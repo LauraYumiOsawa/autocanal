@@ -125,7 +125,7 @@ def test_titulos_recentes_e_perfil_voz(ctx, cfg, con):
 def test_template_tem_todos_os_campos():
     t = TEMPLATE.read_text(encoding="utf-8")
     for campo in ("tema", "perfil_voz", "titulos_recentes", "palavras_min",
-                  "palavras_max", "problemas_anteriores", "dir_plugin"):
+                  "palavras_max", "problemas_anteriores"):
         assert "{" + campo + "}" in t
 
 
@@ -139,10 +139,11 @@ def test_roteiro_grava_json_e_valida_palavras(ctx, cfg, claude_falso):
     roteiro.executar(ctx)
     assert ler_json(ctx, "roteiro.json") == _roteiro(100)
     argv = claude_falso.chamadas()[-1]
-    script = cfg.plugin_dir / "skills" / "yt-script" / "hookscore.py"
     assert argv[argv.index("--allowedTools") + 1:] == [
-        "Read", "WebSearch", "WebFetch"
+        "Read", "WebSearch", "WebFetch", "Bash(python3 metodo/yt-script/hookscore.py:*)"
     ]
+    assert (ctx.pasta / "metodo" / "yt-script" / "SKILL.md").exists()
+    assert "python3 metodo/yt-script/hookscore.py --json" in argv[2]
     assert f"Read(/{cfg.raiz.resolve()}/dados/tokens/**)" in argv
     assert argv[argv.index("--max-turns") + 1] == "30"
     assert "--model" not in argv
@@ -159,7 +160,7 @@ def test_roteiro_inclui_problemas_anteriores(ctx, cfg, claude_falso):
     roteiro.executar(ctx)
     primeiro = claude_falso.chamadas()[0][2]
     assert "por que o mar é salgado" in primeiro
-    assert f"{cfg.plugin_dir}/skills/yt-script/hookscore.py --json" in primeiro
+    assert "python3 metodo/yt-script/hookscore.py --json" in primeiro
     assert "entre 75 e 150" in primeiro
     assert "muito longo" not in primeiro
 

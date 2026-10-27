@@ -160,7 +160,8 @@ def test_sugerir_temas(cfg_nicho, con, claude_falso):
     assert schema["properties"]["temas"]["minItems"] == 2
     assert schema["properties"]["temas"]["maxItems"] == 2
     prompt = argv[2]
-    for trecho in ("youtube-agent:yt-plan", "curiosidades de ciência", "Título que já saiu",
+    assert (cfg.dados / "estrategia" / "metodo" / "yt-plan" / "SKILL.md").exists()
+    for trecho in ("metodo/yt-plan/SKILL.md", "curiosidades de ciência", "Título que já saiu",
                    "tema já usado", "Não faça perguntas"):
         assert trecho in prompt
     r = con.execute("SELECT job_id, etapa FROM chamadas_ia").fetchall()

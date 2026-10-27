@@ -4,14 +4,14 @@ Tema: {tema}
 
 ## Regras de trabalho
 
-1. Use a skill `youtube-agent:yt-script` como método (gancho, virada, corpo, entrega, fechamento com um único pedido).
+1. Siga o método em `metodo/yt-script/SKILL.md` (gancho, virada, corpo, entrega, fechamento com um único pedido).
 2. O perfil de voz do canal, mais abaixo, **substitui** `~/.claude/youtube/voice.md`: não leia nem crie esse arquivo e não peça vídeos de referência.
-3. Não faça perguntas: ninguém vai responder. Decida sozinho. Ignore os passos da skill que dependem de conversa (mostrar opções, perguntar se pode publicar); a sua resposta final é só o JSON pedido.
-4. Não leia nem escreva arquivos fora da pasta atual. A única exceção são os arquivos da própria skill, incluindo o `hookscore.py` citado abaixo.
+3. Não faça perguntas: ninguém vai responder. Decida sozinho. Ignore os passos do método que dependem de conversa (mostrar opções, perguntar se pode publicar); a sua resposta final é só o JSON pedido.
+4. Não leia nem escreva arquivos fora da pasta atual.
 5. Escreva 5 ganchos diferentes, usando fórmulas diferentes. Pontue cada um com
-   `python3 {dir_plugin}/skills/yt-script/hookscore.py --json --hook "<gancho>"`
+   `python3 metodo/yt-script/hookscore.py --json --hook "<gancho>"`
    e use o de maior `verdict`. Essa nota (0 a 100) vai em `nota_gancho`.
-6. Toda afirmação factual do texto falado precisa de fonte: pesquise com WebSearch, confirme com WebFetch e registre em `fontes` a afirmação e a URL da página que a confirma.
+6. Toda afirmação factual do texto falado precisa de fonte: pesquise na web, confirme abrindo a página e registre em `fontes` a afirmação e a URL da página que a confirma.
 7. Nunca invente números, datas, nomes, resultados ou fontes. Se não encontrar confirmação, reescreva a frase sem o dado.
 8. Varie a estrutura, o tipo de gancho e o ângulo em relação aos títulos recentes do canal, listados abaixo.
 9. Se houver problemas de uma versão anterior, corrija todos.

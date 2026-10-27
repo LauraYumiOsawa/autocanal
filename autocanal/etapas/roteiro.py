@@ -106,10 +106,10 @@ def executar(ctx: Contexto) -> None:
         palavras_min=fmt.palavras_min,
         palavras_max=fmt.palavras_max,
         problemas_anteriores=lista_md(problemas_revisao(ctx), "Nenhum: esta é a primeira versão."),
-        dir_plugin=ctx.cfg.plugin_dir,
     )
     r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, "roteiro",
-                  ia.Pedido(prompt=prompt, schema=schema, pasta=ctx.pasta, web=True))
+                  ia.Pedido(prompt=prompt, schema=schema, pasta=ctx.pasta, web=True,
+                            metodos=ia.METODOS["roteiro"], scripts=ia.SCRIPTS["roteiro"]))
     dados = achatar(r.dados) if "secoes" in r.dados else r.dados
     palavras = contar_palavras(" ".join(s["texto"] for s in dados["segmentos"]))
     if not fmt.palavras_min <= palavras <= fmt.palavras_max:

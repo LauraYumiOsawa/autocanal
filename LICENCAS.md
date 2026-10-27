@@ -10,3 +10,4 @@
 | Pixabay (API) | Licença Pixabay | sim, sem atribuição obrigatória | https://pixabay.com/service/license-summary/ | 2026-10-22 |
 | ffmpeg (build GPL, BtbN) | GPL | sim (uso como ferramenta externa, sem redistribuição) | https://github.com/BtbN/FFmpeg-Builds | 2026-10-22 |
 | faster-whisper | MIT | sim | https://github.com/SYSTRAN/faster-whisper | 2026-10-22 |
+| youtube-agent (plugin de skills; usado como método dos prompts) | MIT | sim | https://github.com/Jakeschincariol/youtube-agent-skill | 2026-10-26 |
