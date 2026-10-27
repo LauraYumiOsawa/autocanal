@@ -22,6 +22,8 @@ App local em Python que cria e publica vídeos no YouTube automaticamente (forma
 - `produzir <job>`: roteiro, narração, legendas, visuais (curadoria + FLUX), vídeo, metadados, thumbnail (médio) e revisão; refaz `falhou`/`quarentena`.
 - `revisar <job>`, `aprovar <job>`, `descartar <job>`: ações sobre um job.
 - `tick`: um passo do agendador (o timer roda a cada 15 min).
+- `bancada rodar <job> <roteiro|metadados|revisao> --rotulo <texto> [--modelo M] [--esforco E] [--primeira-versao]`: repete a etapa numa cópia do job em `dados/bancada/` e mede os tokens. Cada execução gasta cota do plano. `--primeira-versao` mede o roteiro como primeira versão, não como refação.
+- `bancada relatorio`: médias por etapa e rótulo.
 - `publicar`, `vetar`, `auth`, `instalar-timer`: ver regras acima.
 
 ## Comandos do projeto (`.claude/commands/`)
