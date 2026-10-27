@@ -85,7 +85,7 @@ def test_resumo_tem_secoes_e_links(cfg, con):
     assert caminho == cfg.dados / "relatorios" / "2026-10-26.md"
     texto = caminho.read_text(encoding="utf-8")
     titulos = ["Produzidos", "Agendados", "Publicados", "Quarentena", "Falhas", "Alertas",
-               "Supervisão", "Consumo do Claude"]
+               "Supervisão", "Consumo de IA"]
     posicoes = [texto.index(f"\n## {t}\n") for t in titulos]
     assert posicoes == sorted(posicoes)
     assert agendado.id in _secao(texto, "Produzidos")
@@ -102,15 +102,30 @@ def test_resumo_tem_secoes_e_links(cfg, con):
     assert "Cota do YouTube esgotada" in al and "limite de uso" in al
     assert "Planejamento automático adiado" in al
     assert f"autocanal vetar {agendado.id}" in _secao(texto, "Supervisão")
-    consumo = _secao(texto, "Consumo do Claude")
-    assert "2 chamadas" in consumo and "US$ 0.75" in consumo
+    consumo = _secao(texto, "Consumo de IA")
+    assert consumo.strip() == "- claude: 2 chamadas, — tokens, custo equivalente de US$ 0.75"
 
 
 def test_resumo_vazio(cfg, con):
     texto = relatorio.gerar_resumo(cfg, con, DIA).read_text(encoding="utf-8")
     for t in ("Produzidos", "Agendados", "Publicados", "Quarentena", "Falhas", "Alertas"):
         assert _secao(texto, t).strip() == "- nenhum"
-    assert "0 chamadas" in _secao(texto, "Consumo do Claude")
+    assert _secao(texto, "Consumo de IA").strip() == "- nenhuma chamada de IA"
+
+
+def test_consumo_por_provedor(cfg, con):
+    for provedor, custo, entrada, saida in (("codex", None, 200, 20), ("claude", 1.5, 100, 50)):
+        con.execute(
+            "INSERT INTO chamadas_ia (etapa, provedor, tokens_entrada, tokens_saida, custo_usd,"
+            " duracao_s, criado_em) VALUES ('roteiro', ?, ?, ?, ?, 1, '2026-10-25T12:00:00+00:00')",
+            (provedor, entrada, saida, custo),
+        )
+    con.commit()
+    inicio, fim = datetime(2026, 10, 25, tzinfo=UTC), datetime(2026, 10, 26, tzinfo=UTC)
+    assert relatorio._consumo(con, inicio, fim) == [
+        "- claude: 1 chamada, 150 tokens, custo equivalente de US$ 1.50",
+        "- codex: 1 chamada, 220 tokens, custo equivalente de —",
+    ]
 
 
 def test_supervisao_termina_apos_os_dias_configurados(cfg, con):

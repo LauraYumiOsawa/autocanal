@@ -160,20 +160,27 @@ def _supervisao(cfg: Config, con: sqlite3.Connection, dia: date) -> list[str]:
 
 
 def _consumo(con: sqlite3.Connection, inicio: datetime, fim: datetime) -> list[str]:
+    """Uma linha por provedor; tokens e custo que o provedor não informa aparecem como —."""
     sql, args = _no_periodo(
-        "SELECT COUNT(*) AS n, COALESCE(SUM(custo_usd), 0) AS custo FROM chamadas_ia WHERE",
+        "SELECT provedor, COUNT(*) AS n, SUM(custo_usd) AS custo,"
+        " SUM(COALESCE(tokens_entrada, 0) + COALESCE(tokens_saida, 0)) AS tokens,"
+        " COUNT(tokens_entrada) + COUNT(tokens_saida) AS com_tokens FROM chamadas_ia WHERE",
         inicio, fim,
     )
-    r = con.execute(sql, args).fetchone()
-    n = r["n"]
-    return [f"- {n} {'chamada' if n == 1 else 'chamadas'}, custo equivalente de"
-            f" US$ {r['custo']:.2f}"]
+    linhas = []
+    for r in con.execute(sql + " GROUP BY provedor ORDER BY provedor", args):
+        n = r["n"]
+        tokens = str(r["tokens"]) if r["com_tokens"] else "—"
+        custo = f"US$ {r['custo']:.2f}" if r["custo"] is not None else "—"
+        linhas.append(f"- {r['provedor']}: {n} {'chamada' if n == 1 else 'chamadas'},"
+                      f" {tokens} tokens, custo equivalente de {custo}")
+    return linhas or ["- nenhuma chamada de IA"]
 
 
 def gerar_resumo(cfg: Config, con: sqlite3.Connection, dia: date) -> Path:
     """Escreve `dados/relatorios/<dia>.md`.
 
-    Produzidos (aprovados pela revisão), Publicados e Consumo do Claude cobrem o dia
+    Produzidos (aprovados pela revisão), Publicados e Consumo de IA cobrem o dia
     anterior a `dia` (00:00–24:00 no fuso do projeto): o resumo sai de manhã. As demais
     seções mostram a situação no momento em que o resumo é gerado.
     """
@@ -204,11 +211,11 @@ def gerar_resumo(cfg: Config, con: sqlite3.Connection, dia: date) -> Path:
         ]),
         "Alertas": lista([f"- {a}" for a in alertas(cfg, con, agora)]),
         "Supervisão": "\n".join(_supervisao(cfg, con, dia)),
-        "Consumo do Claude": lista(_consumo(con, inicio, fim)),
+        "Consumo de IA": lista(_consumo(con, inicio, fim)),
     }
     texto = (
         f"# Resumo do autocanal — {dia:%d/%m/%Y}\n\n"
-        f"Produzidos, Publicados e Consumo do Claude: atividade de {ontem:%d/%m/%Y}"
+        f"Produzidos, Publicados e Consumo de IA: atividade de {ontem:%d/%m/%Y}"
         f" (fuso {cfg.fuso}). As outras seções mostram a situação em {_hora(cfg, agora)}.\n"
         + "".join(f"\n## {titulo}\n\n{corpo}\n" for titulo, corpo in secoes.items())
     )

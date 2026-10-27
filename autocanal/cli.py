@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 import typer
 
 from autocanal import agendador, fila, grade, ia, planejador, produtor, publicador, relatorio
-from autocanal.config import Config, carregar
+from autocanal.config import ETAPAS_IA, Config, carregar
 from autocanal.db import conectar
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
@@ -84,8 +84,9 @@ def diagnostico(ctx: typer.Context) -> None:
     for nome, caminho in (("ffmpeg", cfg.ffmpeg), ("ffprobe", cfg.ffprobe)):
         ok, det = _executa([str(caminho), "-version"])
         resultados.append(_linha(ok, nome, det[:60]))
+    em_uso = sorted({cfg.ia.padrao, *cfg.ia.etapas.values()})
     for nome, cmd in (
-        (f"ia {cfg.ia.padrao}", [cfg.ia.provedores[cfg.ia.padrao].bin, "--version"]),
+        *((f"ia {p}", [cfg.ia.provedores[p].bin, "--version"]) for p in em_uso),
         ("nvidia-smi", ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"]),
         ("docker", ["docker", "info", "--format", "{{.ServerVersion}}"]),
     ):
@@ -94,6 +95,16 @@ def diagnostico(ctx: typer.Context) -> None:
     resultados.append(
         _linha(cfg.client_secret.exists(), "client_secret.json", str(cfg.client_secret))
     )
+    obrigatorios = resultados[:2]
+    for etapa in ETAPAS_IA:
+        falta = ia.faltas(cfg, etapa)
+        detalhe = "" if not falta else (
+            "sem adaptador" if falta == ["sem adaptador"] else f"falta {', '.join(falta)}")
+        nome = f"etapa {etapa} → {ia.provedor_de(cfg, etapa)}"
+        obrigatorios.append(_linha(not falta, nome, detalhe))
+    for nome in sorted({m for ms in ia.METODOS.values() for m in ms}):
+        obrigatorios.append(
+            _linha((cfg.plugin_dir / "skills" / nome / "SKILL.md").exists(), f"método {nome}"))
     for nome in ("PIXABAY_API_KEY", "GOOGLE_TTS_API_KEY", "YOUTUBE_API_KEY"):
         definida = bool(cfg.chaves.get(nome))
         typer.echo(f"[{'OK   ' if definida else 'FALHA'}] {nome}: {'definida' if definida else 'ausente'}")
@@ -103,7 +114,7 @@ def diagnostico(ctx: typer.Context) -> None:
         typer.echo("[FALHA] flux: não instalado (opcional)")
     tokens = sorted((cfg.dados / "tokens").glob("*.json")) if (cfg.dados / "tokens").is_dir() else []
     typer.echo(f"tokens em dados/tokens/: {', '.join(t.stem for t in tokens) or 'nenhum'}")
-    if not all(resultados[:2]):
+    if not all(obrigatorios):
         raise typer.Exit(1)
 
 

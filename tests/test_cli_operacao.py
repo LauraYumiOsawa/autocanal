@@ -444,6 +444,36 @@ def test_diagnostico_lista_chaves_sem_pexels(rodar, monkeypatch):
     assert "PEXELS" not in r.output
 
 
+def test_diagnostico_etapas_e_metodos(rodar, monkeypatch):
+    monkeypatch.setattr(cli, "_executa", lambda cmd: (True, "ok"))
+    r = rodar("diagnostico")
+    assert r.exit_code == 0, r.output
+    assert "[OK   ] ia claude (ok)" in r.output
+    for etapa in ("roteiro", "curadoria", "metadados", "revisao", "temas"):
+        assert f"[OK   ] etapa {etapa} → claude" in r.output
+    for nome in ("yt-script", "yt-package", "yt-seo", "yt-chapters", "yt-plan"):
+        assert f"[OK   ] método {nome}" in r.output
+
+
+def test_diagnostico_capacidade_faltando(rodar, monkeypatch):
+    from autocanal.ia import Capacidades, claude_cli
+
+    monkeypatch.setattr(cli, "_executa", lambda cmd: (True, "ok"))
+    monkeypatch.setattr(claude_cli, "CAPACIDADES", Capacidades(web=False, imagens=True, scripts=True))
+    r = rodar("diagnostico")
+    assert "[FALHA] etapa roteiro → claude (falta web)" in r.output
+    assert "[OK   ] etapa curadoria → claude" in r.output
+    assert r.exit_code == 1
+
+
+def test_diagnostico_metodo_ausente(rodar, monkeypatch, cfg, tmp_path):
+    monkeypatch.setattr(cli, "_executa", lambda cmd: (True, "ok"))
+    monkeypatch.setattr(cli, "carregar", lambda raiz: cfg.model_copy(update={"plugin_dir": tmp_path}))
+    r = rodar("diagnostico")
+    assert "[FALHA] método yt-script" in r.output
+    assert r.exit_code == 1
+
+
 def test_diagnostico_mostra_flux(rodar, monkeypatch, cfg):
     monkeypatch.setattr(cli, "_executa", lambda cmd: (True, "ok"))
     assert "[FALHA] flux: não instalado (opcional)" in rodar("diagnostico").output

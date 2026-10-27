@@ -19,8 +19,8 @@ from autocanal.ia.base import (
 
 __all__ = [
     "ADAPTADORES", "Capacidades", "ErroIA", "IAIndisponivel", "LimiteUso", "METODOS", "PAUSA",
-    "Pedido", "Resultado", "SCRIPTS", "chamar", "livre", "pausa", "pausar", "pausas",
-    "provedor_de",
+    "PRECISA", "Pedido", "Resultado", "SCRIPTS", "chamar", "faltas", "livre", "pausa", "pausar",
+    "pausas", "provedor_de",
 ]
 
 ADAPTADORES: dict[str, ModuleType] = {claude_cli.NOME: claude_cli}
@@ -39,8 +39,27 @@ SCRIPTS: dict[str, tuple[str, ...]] = {
 }
 
 
+# o que cada etapa exige do provedor (o `diagnostico` confere)
+PRECISA: dict[str, Capacidades] = {
+    "roteiro": Capacidades(web=True, imagens=False, scripts=True),
+    "curadoria": Capacidades(web=False, imagens=True, scripts=False),
+    "metadados": Capacidades(web=False, imagens=False, scripts=True),
+    "revisao": Capacidades(web=True, imagens=True, scripts=False),
+    "temas": Capacidades(web=True, imagens=False, scripts=False),
+}
+
+
 def provedor_de(cfg: Config, etapa: str) -> str:
     return cfg.ia.etapas.get(etapa, cfg.ia.padrao)
+
+
+def faltas(cfg: Config, etapa: str) -> list[str]:
+    """Capacidades (`web`, `imagens`, `scripts`) que o provedor da etapa não tem."""
+    adaptador = ADAPTADORES.get(provedor_de(cfg, etapa))
+    if adaptador is None:
+        return ["sem adaptador"]
+    tem, precisa = adaptador.CAPACIDADES, PRECISA[etapa]
+    return [c for c in ("web", "imagens", "scripts") if getattr(precisa, c) and not getattr(tem, c)]
 
 
 def _marcador(cfg: Config, provedor: str) -> Path:
