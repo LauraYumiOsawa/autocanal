@@ -147,3 +147,22 @@ def test_sem_primeira_versao_a_copia_leva_os_problemas(cfg, con, job, falso):
     assert linha["primeira_versao"] is False
     [copia] = (cfg.dados / "bancada").glob(f"*-{job.id}-metadados-antes/jobs/{job.id}")
     assert (copia / "problemas_revisao.json").exists()
+
+
+def test_copia_nao_leva_render_nem_curadoria(cfg, con, job, falso):
+    falso.responder(_ok(METADADOS))
+    pasta = cfg.dados / "jobs" / job.id
+    for sub in ("render", "visuais/curadoria", "visuais/flux_lote/saida"):
+        (pasta / sub).mkdir(parents=True)
+        (pasta / sub / "lixo.bin").write_bytes(b"x")
+    (pasta / "visuais" / "seg_01.jpg").write_bytes(b"j")
+    (pasta / "video.mp4").write_bytes(b"v")
+    bancada.rodar(cfg, con, job.id, "metadados", "antes", agora=AGORA)
+    [copia] = (cfg.dados / "bancada").glob(f"*-{job.id}-metadados-antes/jobs/{job.id}")
+    assert not (copia / "render").exists()
+    assert not (copia / "visuais" / "curadoria").exists()
+    assert not (copia / "visuais" / "flux_lote").exists()
+    assert (copia / "visuais" / "seg_01.jpg").exists() and (copia / "video.mp4").exists()
+    assert (pasta / "render" / "lixo.bin").exists()  # o job real continua intacto
+    assert (pasta / "visuais" / "curadoria" / "lixo.bin").exists()
+    assert (pasta / "visuais" / "flux_lote" / "saida" / "lixo.bin").exists()

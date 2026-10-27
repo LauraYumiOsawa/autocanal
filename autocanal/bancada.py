@@ -23,6 +23,8 @@ from autocanal.texto import contar_palavras
 
 ETAPAS_BANCADA = ("roteiro", "metadados", "revisao")
 RESULTADOS = "resultados.jsonl"
+# Pastas (relativas ao job) que roteiro, metadados e revisão não leem: só pesam na cópia.
+NAO_COPIAR = ("render", "visuais/curadoria", "visuais/flux_lote")
 
 
 def _commit(raiz: Path) -> str | None:
@@ -32,6 +34,14 @@ def _commit(raiz: Path) -> str | None:
     except (OSError, subprocess.SubprocessError):
         return None
     return r.stdout.strip() or None
+
+
+def _ignorar(origem: Path):
+    """`ignore` do copytree: pula as pastas de `NAO_COPIAR` (caminhos relativos ao job)."""
+    def ignorar(pasta: str, nomes: list[str]) -> set[str]:
+        rel = Path(pasta).relative_to(origem)
+        return {n for n in nomes if (rel / n).as_posix() in NAO_COPIAR}
+    return ignorar
 
 
 def _clonar_job(con_real: sqlite3.Connection, con: sqlite3.Connection, job_id: str,
@@ -95,7 +105,8 @@ def rodar(
     agora = agora or datetime.now(UTC)
     job_real = fila.obter(con_real, job_id)
     base = cfg.dados / "bancada" / f"{agora:%Y%m%dT%H%M%S}-{job_id}-{etapa}-{rotulo}"
-    shutil.copytree(cfg.dados / "jobs" / job_id, base / "jobs" / job_id)
+    origem = cfg.dados / "jobs" / job_id
+    shutil.copytree(origem, base / "jobs" / job_id, ignore=_ignorar(origem))
     if primeira_versao:  # só na cópia: sem os problemas, o roteiro parte do zero como na 1ª vez
         (base / "jobs" / job_id / PROBLEMAS_REVISAO).unlink(missing_ok=True)
 
