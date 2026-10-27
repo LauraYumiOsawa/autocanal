@@ -181,3 +181,44 @@ def test_cli_bancada_job_sem_pasta(raiz_teste, cfg, con, job):
                                      "metadados", "--rotulo", "x"])
     assert r.exit_code == 1 and "erro:" in r.output and job.id in r.output
     assert not isinstance(r.exception, FileNotFoundError)
+
+
+def test_bancada_revisao_clona_em_revisao_e_le_o_parecer(cfg, con, job):
+    vistos = {}
+
+    def revisa(ctx):
+        vistos["estado"] = ctx.job.estado
+        (ctx.pasta / "revisao_1.json").write_text(json.dumps({
+            "aprovado": False, "etapa_para_refazer": "visuais", "problemas": ["a", "b"],
+        }), encoding="utf-8")
+
+    linha = bancada.rodar(cfg, con, job.id, "revisao", "antes", registro={"revisao": revisa},
+                          agora=AGORA)
+    assert vistos["estado"].value == "em_revisao"
+    assert fila.obter(con, job.id).estado.value == "agendado"
+    assert linha["erro"] is None
+    assert linha["metricas"] == {"aprovado": False, "etapa_para_refazer": "visuais",
+                                 "problemas": 2}
+
+
+@pytest.mark.parametrize("conferidas, esperado", [
+    (None, None),
+    ({"resultado": [{"status": "confirmada"}, {"status": "inacessivel"}]}, 1),
+])
+def test_bancada_roteiro_mede_palavras_gancho_e_fontes(cfg, con, job, conferidas, esperado):
+    def escreve(ctx):
+        palavras = " ".join(["mar"] * 100)
+        (ctx.pasta / "roteiro.json").write_text(json.dumps({
+            "segmentos": [{"texto": palavras}], "nota_gancho": 85,
+            "fontes": [{"url": "https://a"}, {"url": "https://b"}],
+        }), encoding="utf-8")
+        if conferidas is not None:
+            (ctx.pasta / "fontes_conferidas.json").write_text(json.dumps(conferidas),
+                                                              encoding="utf-8")
+
+    linha = bancada.rodar(cfg, con, job.id, "roteiro", "antes", registro={"roteiro": escreve},
+                          agora=AGORA)
+    assert linha["erro"] is None
+    m = linha["metricas"]
+    assert (m["nota_gancho"], m["fontes"], m["fontes_confirmadas"]) == (85, 2, esperado)
+    assert m["palavras_ok"] is True  # 100 palavras, faixa do short: 75 a 150
