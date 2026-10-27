@@ -167,3 +167,17 @@ def test_copia_nao_leva_render_nem_curadoria(cfg, con, job, falso):
     assert (pasta / "render" / "lixo.bin").exists()  # o job real continua intacto
     assert (pasta / "visuais" / "curadoria" / "lixo.bin").exists()
     assert (pasta / "visuais" / "flux_lote" / "saida" / "lixo.bin").exists()
+
+
+def test_cli_bancada_job_sem_pasta(raiz_teste, cfg, con, job):
+    import shutil
+
+    from typer.testing import CliRunner
+
+    from autocanal import cli
+
+    shutil.rmtree(cfg.dados / "jobs" / job.id)
+    r = CliRunner().invoke(cli.app, ["--raiz", str(raiz_teste), "bancada", "rodar", job.id,
+                                     "metadados", "--rotulo", "x"])
+    assert r.exit_code == 1 and "erro:" in r.output and job.id in r.output
+    assert not isinstance(r.exception, FileNotFoundError)

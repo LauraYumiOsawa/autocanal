@@ -533,6 +533,9 @@ def bancada_rodar(
     """Roda a etapa numa cópia isolada do job e mostra tokens, custo e métricas."""
     cfg = carregar(ctx.obj)
     con = conectar(cfg.dados / "autocanal.db")
+    if not (cfg.dados / "jobs" / job).is_dir():  # job só no banco: não há o que copiar
+        typer.echo(f"erro: o job {job} não tem pasta em dados/jobs")
+        raise typer.Exit(1)
     try:
         linha = bancada.rodar(cfg, con, job, etapa, rotulo, modelo=modelo, esforco=esforco,
                               primeira_versao=primeira_versao)
