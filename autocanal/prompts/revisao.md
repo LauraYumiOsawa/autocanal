@@ -18,7 +18,9 @@ Formato: {formato}
 - Mídias por trecho (origem, licença e, quando houver, o motivo da escolha de cada imagem ou vídeo usado, na ordem dos segmentos):
 {midias}
   O crédito "Imagens: Pixabay" e o aviso de IA da descrição são gerados automaticamente a partir dessas mídias, na proporção certa: não peça para mudar a redação deles.
-- Quadros extraídos do vídeo final (estão nas imagens deste pedido):
+- Visual de cada segmento (estão nas imagens deste pedido), com o texto falado naquele segmento:
+{visuais}
+- Quadros extraídos do vídeo final (estão nas imagens deste pedido), para conferir o vídeo montado: legendas, corte e enquadramento:
 {quadros}
 
 ## Últimos títulos do canal
@@ -27,7 +29,7 @@ Formato: {formato}
 
 ## O que verificar
 
-1. **Visual e fala (o critério mais importante).** O mais importante do vídeo é o visual. Em cada quadro, a imagem precisa mostrar concretamente o que está sendo falado naquele momento (compare com o segmento correspondente do roteiro). Paisagem bonita, pessoa genérica ou objeto vizinho do assunto = reprovação em `visuais`. Todos os visuais devem seguir um mesmo estilo (foto/filmagem real ou desenho), sem misturar.
+1. **Visual e fala (o critério mais importante).** O mais importante do vídeo é o visual. Compare **cada** visual de segmento com o texto falado naquele segmento, um por um, todos eles: a imagem precisa mostrar concretamente o que está sendo falado. Os quadros servem para conferir o vídeo montado. Abra todas as imagens do pedido numa única rodada de leituras (várias aberturas de arquivo no mesmo turno), para não reler o contexto a cada imagem. Paisagem bonita, pessoa genérica ou objeto vizinho do assunto = reprovação em `visuais`. Todos os visuais devem seguir um mesmo estilo (foto/filmagem real ou desenho), sem misturar.
 2. **Fatos.** A conferência automática acima diz se o trecho citado de cada fonte foi encontrado na página. Fonte `confirmada`: julgue só se o trecho sustenta a afirmação, sem abrir a página. Fonte com outro status: abra a URL e confirme que a página diz o que o roteiro afirma. Afirmação factual sem fonte, ou com fonte que não a confirma = reprovação. A pesquisa na web serve para entender o contexto; não substitui a fonte citada.
 3. **Narração.** A transcrição bate com o roteiro: a voz não pulou, trocou nem inventou trechos. Diferenças pequenas de grafia, pontuação ou números escritos por extenso são aceitáveis.
 4. **Valor próprio e variação.** O vídeo entrega algo concreto e não repete o ângulo, a estrutura ou o título dos vídeos recentes do canal (risco de conteúdo inautêntico ou repetitivo).

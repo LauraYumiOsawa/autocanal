@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -228,21 +229,55 @@ def _dados_do_video(ctx: Contexto) -> dict[str, str]:
     }
 
 
+def _visuais_por_segmento(ctx: Contexto) -> list[Path]:
+    """Um JPEG reduzido por segmento (`revisao/visuais/seg_NN.jpg`), na ordem do roteiro.
+
+    O arquivo vem sempre de `ctx.pasta / "visuais"` (na bancada o `caminho` registrado
+    aponta para o job real). Mídia ausente é pulada: as checagens já a acusam.
+    """
+    destino = ctx.pasta / "revisao" / "visuais"
+    saidas: list[Path] = []
+    for i, m in enumerate(ler_json_opcional(ctx, "fontes_midia.json", []), 1):
+        arquivo = ctx.pasta / "visuais" / Path(m["caminho"]).name
+        if not arquivo.exists():
+            continue
+        destino.mkdir(parents=True, exist_ok=True)
+        saida = destino / f"seg_{i:02d}.jpg"
+        if m["tipo"] == "video":
+            tmp = ctx.pasta / "revisao" / f"quadro_seg_{i:02d}"
+            [quadro] = ctx.midia.extrair_frames(arquivo, 1, tmp, lado_max=LADO_QUADRO)
+            shutil.move(str(quadro), saida)
+            shutil.rmtree(tmp, ignore_errors=True)
+        else:
+            with Image.open(arquivo) as im:
+                im = im.convert("RGB")
+                im.thumbnail((LADO_QUADRO, LADO_QUADRO))
+                im.save(saida, "JPEG")
+        saidas.append(saida)
+    return saidas
+
+
 def _revisor(ctx: Contexto) -> dict:
     fmt = ctx.formato
     quadros = ctx.midia.extrair_frames(
         ctx.pasta / "video.mp4", N_QUADROS, ctx.pasta / "revisao" / "quadros",
         lado_max=LADO_QUADRO,
     )
+    visuais = _visuais_por_segmento(ctx)
+    segmentos = ler_json(ctx, "roteiro.json")["segmentos"]
     prompt = carregar_prompt(
         "revisao",
         **_dados_do_video(ctx),
         tema=ctx.job.tema,
         formato=fmt.resumo,
         quadros=lista_md([str(q.relative_to(ctx.pasta)) for q in quadros], "(nenhum)"),
+        visuais=lista_md([
+            f'{v.relative_to(ctx.pasta)} — "{segmentos[int(v.stem[4:]) - 1]["texto"]}"'
+            for v in visuais
+        ], "(nenhum)"),
         titulos_recentes=lista_md(titulos_recentes(ctx, N_TITULOS), "(nenhum ainda)"),
     )
-    imagens = list(quadros)
+    imagens = [*quadros, *visuais]
     if (ctx.pasta / "thumbnail.jpg").exists():
         imagens.append(ctx.pasta / "thumbnail.jpg")
     r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, NOME, ia.Pedido(

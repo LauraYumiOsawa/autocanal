@@ -496,3 +496,77 @@ def test_revisor_recebe_conferencia(ctx, cfg, con, claude_falso, monkeypatch):
     revisao.executar(ctx)
     prompt = claude_falso.chamadas()[0][2]
     assert '- [confirmada] 35 g de sal por litro — https://exemplo.org/mar — "35 g de sal por litro"' in prompt
+
+
+def _png(caminho: Path, tamanho):
+    from PIL import Image
+
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", tamanho, "red").save(caminho)
+
+
+def test_visuais_retrato_usa_arquivo_do_job(ctx, tmp_path):
+    from PIL import Image
+
+    _png(ctx.pasta / "visuais" / "seg_01.png", (1080, 1920))
+    _png(tmp_path / "outro_job" / "visuais" / "seg_01.png", (10, 10))
+    gravar_json(ctx, "fontes_midia.json", [
+        {"caminho": str(tmp_path / "outro_job" / "visuais" / "seg_01.png"), "tipo": "imagem"},
+    ])
+    [saida] = revisao._visuais_por_segmento(ctx)
+    assert saida == ctx.pasta / "revisao" / "visuais" / "seg_01.jpg"
+    assert Image.open(saida).size == (540, 960)
+
+
+def test_visuais_paisagem(ctx):
+    from PIL import Image
+
+    _png(ctx.pasta / "visuais" / "seg_01.png", (1920, 1080))
+    gravar_json(ctx, "fontes_midia.json", [
+        {"caminho": "visuais/seg_01.png", "tipo": "imagem"},
+    ])
+    [saida] = revisao._visuais_por_segmento(ctx)
+    assert Image.open(saida).size == (960, 540)
+
+
+def test_visuais_video_usa_extrair_frames(ctx, videos, monkeypatch):
+    (ctx.pasta / "visuais").mkdir(exist_ok=True)
+    shutil.copy(videos["ok"], ctx.pasta / "visuais" / "seg_02.mp4")
+    gravar_json(ctx, "fontes_midia.json", [
+        {"caminho": "visuais/seg_01.jpg", "tipo": "imagem"},
+        {"caminho": "visuais/seg_02.mp4", "tipo": "video"},
+    ])
+    chamadas = []
+    original = type(ctx.midia).extrair_frames
+
+    def espia(self, video, n, destino, lado_max=None):
+        chamadas.append((video.name, n, lado_max))
+        return original(self, video, n, destino, lado_max=lado_max)
+
+    monkeypatch.setattr(type(ctx.midia), "extrair_frames", espia)
+    [saida] = revisao._visuais_por_segmento(ctx)  # o item 1 não existe: é pulado
+    assert saida.name == "seg_02.jpg" and saida.exists()
+    assert chamadas == [("seg_02.mp4", 1, 960)]
+
+
+def test_visuais_ausente_e_pulado(ctx):
+    assert revisao._visuais_por_segmento(ctx) == []
+
+
+def test_revisor_recebe_visuais_depois_dos_quadros(ctx, cfg, con, claude_falso):
+    from PIL import Image
+
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    for i in (1, 3):
+        _png(ctx.pasta / "visuais" / f"seg_{i:02d}.jpg", (800, 600))
+    Image.new("RGB", (1280, 720)).save(ctx.pasta / "thumbnail.jpg")
+    claude_falso.responder(_parecer(True))
+    revisao.executar(ctx)
+    prompt = claude_falso.chamadas()[0][2]
+    assert f'revisao/visuais/seg_01.jpg — "{TEXTOS[0]}"' in prompt
+    assert f'revisao/visuais/seg_03.jpg — "{TEXTOS[2]}"' in prompt
+    imagens = prompt.split("Imagens deste pedido, na ordem:\n", 1)[1].splitlines()
+    assert [i.split("`")[1] for i in imagens] == [
+        *(f"revisao/quadros/quadro_{i:02d}.jpg" for i in range(1, 7)),
+        "revisao/visuais/seg_01.jpg", "revisao/visuais/seg_03.jpg", "thumbnail.jpg",
+    ]
