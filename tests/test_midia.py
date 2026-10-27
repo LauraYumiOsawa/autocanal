@@ -82,6 +82,30 @@ def test_extrair_frames(midia, tmp_path):
     assert frames[0].name == "quadro_01.jpg"
 
 
+def _video_cor(midia, destino, tamanho):
+    midia.rodar(["-f", "lavfi", "-i", f"color=c=red:s={tamanho}:d=1:r=25",
+                 "-c:v", "libx264", "-pix_fmt", "yuv420p", str(destino)])
+    return destino
+
+
+def test_extrair_frames_lado_max_retrato(midia, tmp_path):
+    from PIL import Image
+
+    v = _video_cor(midia, tmp_path / "r.mp4", "1080x1920")
+    [q] = midia.extrair_frames(v, 1, tmp_path / "q", lado_max=960)
+    assert Image.open(q).size == (540, 960)
+
+
+def test_extrair_frames_lado_max_paisagem(midia, tmp_path):
+    from PIL import Image
+
+    v = _video_cor(midia, tmp_path / "p.mp4", "1920x1080")
+    [q] = midia.extrair_frames(v, 1, tmp_path / "q", lado_max=960)
+    assert Image.open(q).size == (960, 540)
+    [cheio] = midia.extrair_frames(v, 1, tmp_path / "c")
+    assert Image.open(cheio).size == (1920, 1080)
+
+
 def test_rodar_erro_tem_stderr(midia):
     with pytest.raises(ErroMidia) as e:
         midia.rodar(["-i", "/nao/existe.mp4", "-f", "null", "-"])

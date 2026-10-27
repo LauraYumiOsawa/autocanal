@@ -26,6 +26,7 @@ from autocanal.fila import Estado
 
 NOME = "revisao"
 N_QUADROS = 6
+LADO_QUADRO = 960  # quadros menores: ~700 tokens cada em vez de ~1.800, relidos a cada turno
 N_TITULOS = 15
 N_ROTEIROS = 30
 LOUDNESS_ALVO = -14.0
@@ -226,7 +227,8 @@ def _dados_do_video(ctx: Contexto) -> dict[str, str]:
 def _revisor(ctx: Contexto) -> dict:
     fmt = ctx.formato
     quadros = ctx.midia.extrair_frames(
-        ctx.pasta / "video.mp4", N_QUADROS, ctx.pasta / "revisao" / "quadros"
+        ctx.pasta / "video.mp4", N_QUADROS, ctx.pasta / "revisao" / "quadros",
+        lado_max=LADO_QUADRO,
     )
     prompt = carregar_prompt(
         "revisao",

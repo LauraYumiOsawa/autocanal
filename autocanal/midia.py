@@ -103,15 +103,20 @@ class Midia:
             intervalos.append((inicio, self.info(arquivo).duracao))
         return intervalos
 
-    def extrair_frames(self, video: Path, n: int, destino: Path) -> list[Path]:
+    def extrair_frames(
+        self, video: Path, n: int, destino: Path, lado_max: int | None = None
+    ) -> list[Path]:
+        """`n` quadros espaçados; com `lado_max`, reduzidos para que o lado maior caiba nele."""
         destino.mkdir(parents=True, exist_ok=True)
+        escala = [] if lado_max is None else [
+            "-vf", f"scale='if(gte(iw,ih),{lado_max},-2)':'if(gte(iw,ih),-2,{lado_max})'"]
         dur = self.info(video).duracao
         saidas: list[Path] = []
         for i in range(n):
             t = (i + 0.5) * dur / n
             saida = destino / f"quadro_{i + 1:02d}.jpg"
             self.rodar(
-                ["-ss", f"{t:.3f}", "-i", str(video), "-frames:v", "1",
+                ["-ss", f"{t:.3f}", "-i", str(video), *escala, "-frames:v", "1",
                  "-q:v", "2", str(saida)]
             )
             saidas.append(saida)

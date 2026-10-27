@@ -464,3 +464,12 @@ def test_revisor_recebe_dados_no_prompt(ctx, cfg, con, claude_falso):
     assert '"origem":"pixabay"' in prompt and '"trecho":1' in prompt
     assert '"35 g de sal por litro"' in prompt
     assert '"palavras"' not in prompt and "roteiro.json" not in prompt
+
+
+def test_revisao_quadros_reduzidos(ctx, cfg, con, claude_falso):
+    from PIL import Image
+
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    claude_falso.responder(_parecer(True))
+    revisao.executar(ctx)
+    assert max(Image.open(ctx.pasta / "revisao" / "quadros" / "quadro_01.jpg").size) <= 960
