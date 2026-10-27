@@ -174,4 +174,16 @@ Candidatas e regra de aceite, todas medidas pela bancada:
 
 ## 11. Resultados
 
-(preenchido pela execução: linha de base, depois, decisão)
+### Linha de base (2026-10-27, commit `add83a8`, rótulo `antes`)
+
+| Job | Etapa | Tokens de entrada | Tokens de saída | US$ equiv. | Turnos | Métricas |
+|---|---|---|---|---|---|---|
+| short-5643 | roteiro | 837.232 | 22.222 | 1,18 | 28 | palavras ok, gancho 44, 11 fontes |
+| short-5643 | metadados | 222.824 | 2.236 | 0,20 | 9 | título 94, 1 problema |
+| short-5643 | revisão | 586.310 | 11.748 | 1,03 | 27 | reprovado (visuais), 6 problemas |
+| medio-e862 | roteiro | 1.263.814 | 48.908 | 2,03 | 36 | palavras ok, gancho 44, 25 fontes |
+| medio-e862 | metadados | 284.949 | 3.150 | 0,19 | 13 | título 100, 1 problema |
+| medio-e862 | revisão | 1.885.374 | 20.939 | 1,96 | 75 | reprovado (visuais), 6 problemas |
+| **soma** | | **5.080.503** | **109.203** | **6,59** | | |
+
+A revisão do médio usou 75 turnos com `--max-turns 30`, o que confirma o achado 3.
