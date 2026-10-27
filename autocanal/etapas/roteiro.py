@@ -1,7 +1,7 @@
 """Etapa roteiro: a IA (método yt-script) escreve o roteiro com fontes."""
 from __future__ import annotations
 
-from autocanal import ia
+from autocanal import fontes, ia
 from autocanal.etapas.base import (
     Contexto,
     ErroEtapa,
@@ -27,9 +27,11 @@ _FONTES = {
     "type": "array",
     "items": {
         "type": "object",
-        "required": ["afirmacao", "url"],
+        "required": ["afirmacao", "url", "trecho"],
         "additionalProperties": False,
-        "properties": {"afirmacao": _TEXTO, "url": _TEXTO},
+        # trecho literal da página: o Python confere sem IA (fontes.py)
+        "properties": {"afirmacao": _TEXTO, "url": _TEXTO,
+                       "trecho": {"type": "string", "maxLength": 300}},
     },
 }
 ROTEIRO_SHORT = {
@@ -117,3 +119,4 @@ def executar(ctx: Contexto) -> None:
             f"roteiro com {palavras} palavras (esperado {fmt.palavras_min}–{fmt.palavras_max})"
         )
     gravar_json(ctx, "roteiro.json", dados)
+    fontes.conferidas(ctx.pasta, dados["fontes"])

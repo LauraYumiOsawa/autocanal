@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from autocanal import fila, ia
+from autocanal import fila, fontes, ia
 from autocanal.etapas.metadados import AVISOS_IA
 from autocanal.etapas.base import (
     PROBLEMAS_REVISAO,
@@ -216,6 +216,10 @@ def _dados_do_video(ctx: Contexto) -> dict[str, str]:
         "transcricao": json_compacto(
             ler_json_opcional(ctx, "transcricao.json", {}).get("texto", "")),
         "metadados": json_compacto({k: meta.get(k) for k in CAMPOS_METADADOS}),
+        "fontes_conferidas": lista_md([
+            f'[{c["status"]}] {c["afirmacao"]} — {c["url"]} — "{c["trecho"]}"'
+            for c in fontes.conferidas(ctx.pasta, roteiro.get("fontes", []))
+        ], "(nenhuma fonte)"),
         "midias": json_compacto([
             {"trecho": i, "origem": m.get("origem"), "licenca": m.get("licenca"),
              "motivo": m.get("motivo", "")}

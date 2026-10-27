@@ -11,6 +11,8 @@ Formato: {formato}
 {transcricao}
 - Metadados (título, texto da thumbnail, descrição final, tags e capítulos):
 {metadados}
+- Conferência automática das fontes (status, afirmação, URL e trecho citado):
+{fontes_conferidas}
 - No Short não há thumbnail: ignore `texto_thumb` e `cena_thumb` dos metadados.
 - `thumbnail.jpg` (só no vídeo médio): ela está nas imagens deste pedido; confira se o texto está legível, se a imagem combina com o título e se não tem marca, logotipo ou pessoa famosa.
 - Mídias por trecho (origem, licença e, quando houver, o motivo da escolha de cada imagem ou vídeo usado, na ordem dos segmentos):
@@ -26,7 +28,7 @@ Formato: {formato}
 ## O que verificar
 
 1. **Visual e fala (o critério mais importante).** O mais importante do vídeo é o visual. Em cada quadro, a imagem precisa mostrar concretamente o que está sendo falado naquele momento (compare com o segmento correspondente do roteiro). Paisagem bonita, pessoa genérica ou objeto vizinho do assunto = reprovação em `visuais`. Todos os visuais devem seguir um mesmo estilo (foto/filmagem real ou desenho), sem misturar.
-2. **Fatos.** Para cada afirmação factual do texto falado, abra a URL citada em `fontes` e confirme que a página diz o que o roteiro afirma. Afirmação factual sem fonte, com fonte que não a confirma ou com link que não abre = reprovação. A pesquisa na web serve para entender o contexto; não substitui a fonte citada.
+2. **Fatos.** A conferência automática acima diz se o trecho citado de cada fonte foi encontrado na página. Fonte `confirmada`: julgue só se o trecho sustenta a afirmação, sem abrir a página. Fonte com outro status: abra a URL e confirme que a página diz o que o roteiro afirma. Afirmação factual sem fonte, ou com fonte que não a confirma = reprovação. A pesquisa na web serve para entender o contexto; não substitui a fonte citada.
 3. **Narração.** A transcrição bate com o roteiro: a voz não pulou, trocou nem inventou trechos. Diferenças pequenas de grafia, pontuação ou números escritos por extenso são aceitáveis.
 4. **Valor próprio e variação.** O vídeo entrega algo concreto e não repete o ângulo, a estrutura ou o título dos vídeos recentes do canal (risco de conteúdo inautêntico ou repetitivo).
 5. **Embalagem e diretrizes.** Título, texto da thumbnail e descrição cumprem o que o vídeo entrega, sem enganar. Nada de tema sensível ou proibido pelas diretrizes da comunidade do YouTube. Os quadros não mostram marcas, pessoas reais identificáveis, texto ilegível nem nada impróprio, nem marcas d'água.

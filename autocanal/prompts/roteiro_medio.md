@@ -11,7 +11,7 @@ Tema: {tema}
 5. Escreva 5 ganchos diferentes, usando fórmulas diferentes. Pontue os 5 numa única chamada com
    `python3 metodo/pontuar.py ganchos "<gancho 1>" "<gancho 2>" "<gancho 3>" "<gancho 4>" "<gancho 5>"`
    e use o de maior `verdict`. Essa nota (0 a 100) vai em `nota_gancho`.
-6. Toda afirmação factual do texto falado precisa de fonte: pesquise na web, confirme abrindo a página e registre em `fontes` a afirmação e a URL da página que a confirma.
+6. Toda afirmação factual do texto falado precisa de fonte: pesquise na web, confirme abrindo a página e registre em `fontes` a `afirmacao`, a `url` e o `trecho`: uma frase copiada literalmente da página (até 300 caracteres) que confirma a afirmação. O sistema confere automaticamente se o trecho está na página.
 7. Nunca invente números, datas, nomes, resultados ou fontes. Se não encontrar confirmação, reescreva a frase sem o dado.
 8. Varie a estrutura, o tipo de gancho e o ângulo em relação aos títulos recentes do canal, listados abaixo.
 9. Se houver problemas de uma versão anterior, corrija todos.
@@ -38,7 +38,7 @@ Tema: {tema}
     - `texto`: exatamente o que a voz vai falar, em pt-BR, escrito como se fala. Sem marcações, sem indicações de cena, sem emojis, sem hashtags.
     - `visual`: consulta curta **em inglês** (2 a 5 palavras) para buscar vídeo ou foto num banco de imagens (Pixabay). Algo concreto e filmável, sem nomes de marcas nem de pessoas.
     - `cena`: de 15 a 40 palavras **em inglês** descrevendo concretamente o que a imagem deve mostrar para ilustrar aquela frase (assunto, ação, ambiente, luz). Serve para escolher a imagem e para gerá-la quando o banco não tiver nada. Sem texto escrito na imagem, sem marcas, logotipos ou pessoas reais e famosas. Se aparecer celular, computador ou TV, a tela mostra só um ícone simples ou está desfocada (nada de interface, letras ou números), e o aparelho aparece inteiro, de um ângulo simples. O gerador de imagens erra quantidades e diagramas: não dependa de um número exato de objetos ("quatro satélites") nem de esquemas técnicos; descreva uma cena concreta com um objeto principal em destaque.
-- `fontes`: uma entrada por afirmação factual, com `afirmacao` e `url`.
+- `fontes`: uma entrada por afirmação factual, com `afirmacao`, `url` e `trecho`.
 - `resumo`: uma ou duas frases dizendo do que o vídeo trata.
 
 A soma das palavras de todos os `texto` deve ficar entre 450 e 600 (cerca de 150 palavras por minuto) e nunca fora do limite de {palavras_min} a {palavras_max}. Conte antes de responder.

@@ -30,7 +30,8 @@ def _roteiro(palavras: int = 100, n: int = 6) -> dict:
     ]
     return {
         "gancho": "palavra0x0", "nota_gancho": 72, "segmentos": segs,
-        "fontes": [{"afirmacao": "o mar é salgado", "url": "https://exemplo.org/mar"}],
+        "fontes": [{"afirmacao": "o mar é salgado", "url": "https://exemplo.org/mar",
+                    "trecho": "a água do mar é salgada"}],
         "resumo": "Por que o mar é salgado.",
     }
 

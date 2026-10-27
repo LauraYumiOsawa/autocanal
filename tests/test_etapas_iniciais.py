@@ -54,7 +54,8 @@ def _roteiro(palavras: int, n_segmentos: int = 6) -> dict:
                      "visual": f"ocean view {s}", "cena": f"a calm ocean view number {s}"})
     return {
         "gancho": segs[0]["texto"].split()[0], "nota_gancho": 72, "segmentos": segs,
-        "fontes": [{"afirmacao": "o mar é salgado", "url": "https://exemplo.org/mar"}],
+        "fontes": [{"afirmacao": "o mar é salgado", "url": "https://exemplo.org/mar",
+                    "trecho": "a água do mar é salgada"}],
         "resumo": "Por que o mar é salgado.",
     }
 
@@ -428,7 +429,8 @@ def _roteiro_medio(segs_por_secao=(2, 3, 2), palavras_por_seg=25) -> dict:
              "visual": f"ocean {s} {k}", "cena": f"a wide ocean scene {s} {k}"}
             for k in range(n)]})
     return {"gancho": "p0x0x0", "nota_gancho": 70, "secoes": secoes,
-            "fontes": [{"afirmacao": "o mar é salgado", "url": "https://exemplo.org/mar"}],
+            "fontes": [{"afirmacao": "o mar é salgado", "url": "https://exemplo.org/mar",
+                    "trecho": "a água do mar é salgada"}],
             "resumo": "Por que o mar é salgado."}
 
 
@@ -661,3 +663,12 @@ def test_visuais_refazem_so_os_trechos_apontados_pelo_revisor(ctx, monkeypatch):
     assert banco.pedidos == [["seg_02"]]
     assert [f["url"] for f in ler_json(ctx, "fontes_midia.json")] == [
         "flux:1", "flux:novo-seg_02", "flux:3"]
+
+
+def test_roteiro_grava_fontes_conferidas(ctx, cfg, claude_falso):
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    claude_falso.responder(_ok(_roteiro(100)))
+    roteiro.executar(ctx)
+    conf = ler_json(ctx, "fontes_conferidas.json")
+    assert [r["status"] for r in conf["resultado"]] == ["inacessivel"]  # rede bloqueada
+    assert conf["fontes"] == [{"url": "https://exemplo.org/mar", "trecho": "a água do mar é salgada"}]

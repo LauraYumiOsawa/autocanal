@@ -11,6 +11,17 @@ PLUGIN_DIR = Path(
 )
 
 
+@pytest.fixture(autouse=True)
+def sem_rede_nas_fontes(monkeypatch):
+    """A conferência de fontes nunca baixa páginas de verdade nos testes."""
+    import requests
+
+    def bloqueado(url, **kw):
+        raise requests.ConnectionError(f"rede bloqueada nos testes: {url}")
+
+    monkeypatch.setattr("autocanal.fontes.requests.get", bloqueado, raising=False)
+
+
 @pytest.fixture
 def raiz_teste(tmp_path: Path) -> Path:
     (tmp_path / "config").mkdir()

@@ -473,3 +473,26 @@ def test_revisao_quadros_reduzidos(ctx, cfg, con, claude_falso):
     claude_falso.responder(_parecer(True))
     revisao.executar(ctx)
     assert max(Image.open(ctx.pasta / "revisao" / "quadros" / "quadro_01.jpg").size) <= 960
+
+
+def test_revisor_recebe_conferencia(ctx, cfg, con, claude_falso, monkeypatch):
+    from autocanal import fontes
+
+    class Pagina:
+        status_code, headers, encoding = 200, {"Content-Type": "text/html"}, "utf-8"
+
+        def iter_content(self, chunk_size=65536):
+            yield "<p>O mar tem 35 g de sal por litro de água.</p>".encode()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(fontes.requests, "get", lambda url, **kw: Pagina())
+    rot = ler_json(ctx, "roteiro.json")
+    rot["fontes"][0]["trecho"] = "35 g de sal por litro"
+    gravar_json(ctx, "roteiro.json", rot)
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    claude_falso.responder(_parecer(True))
+    revisao.executar(ctx)
+    prompt = claude_falso.chamadas()[0][2]
+    assert '- [confirmada] 35 g de sal por litro — https://exemplo.org/mar — "35 g de sal por litro"' in prompt
