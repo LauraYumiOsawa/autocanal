@@ -448,3 +448,19 @@ def test_schema_revisor_tem_trechos_visuais():
     texto = (Path(__file__).parents[1] / "autocanal" / "prompts" / "revisao.md").read_text(
         encoding="utf-8")
     assert "`trechos_visuais`" in texto
+
+
+def test_revisor_recebe_dados_no_prompt(ctx, cfg, con, claude_falso):
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    gravar_json(ctx, "transcricao.json", {
+        "texto": "o mar é salgado porque sim",
+        "palavras": [{"texto": "sal.", "inicio": 34.2, "fim": 34.6}],
+    })
+    claude_falso.responder(_parecer(True))
+    revisao.executar(ctx)
+    prompt = claude_falso.chamadas()[0][2]
+    assert '"o mar é salgado porque sim"' in prompt
+    assert "Por que o mar é salgado? 3 motivos" in prompt
+    assert '"origem":"pixabay"' in prompt and '"trecho":1' in prompt
+    assert '"35 g de sal por litro"' in prompt
+    assert '"palavras"' not in prompt and "roteiro.json" not in prompt

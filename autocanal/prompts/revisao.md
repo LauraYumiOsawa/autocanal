@@ -3,14 +3,19 @@ Você é o revisor de qualidade de um canal automático do YouTube. Seja **rigor
 Tema do vídeo: {tema}
 Formato: {formato}
 
-## O que ler (na pasta atual)
+## Dados do vídeo
 
-- `roteiro.json`: o texto falado de cada segmento e as `fontes` (afirmação + URL).
-- `transcricao.json`: a transcrição da narração que foi realmente gerada.
-- `metadados.json`: título, texto da thumbnail, descrição final, tags e capítulos.
-- No Short não há thumbnail: ignore `texto_thumb` e `cena_thumb` do `metadados.json`.
+- Roteiro (texto falado e cena de cada segmento, na ordem, e as `fontes`: afirmação + URL):
+{roteiro}
+- Transcrição da narração que foi realmente gerada:
+{transcricao}
+- Metadados (título, texto da thumbnail, descrição final, tags e capítulos):
+{metadados}
+- No Short não há thumbnail: ignore `texto_thumb` e `cena_thumb` dos metadados.
 - `thumbnail.jpg` (só no vídeo médio): ela está nas imagens deste pedido; confira se o texto está legível, se a imagem combina com o título e se não tem marca, logotipo ou pessoa famosa.
-- `fontes_midia.json`: origem, URL, licença e, quando houver, o motivo da escolha de cada imagem ou vídeo usado (na ordem dos segmentos). O crédito "Imagens: Pixabay" e o aviso de IA da descrição são gerados automaticamente a partir deste arquivo, na proporção certa: não peça para mudar a redação deles.
+- Mídias por trecho (origem, licença e, quando houver, o motivo da escolha de cada imagem ou vídeo usado, na ordem dos segmentos):
+{midias}
+  O crédito "Imagens: Pixabay" e o aviso de IA da descrição são gerados automaticamente a partir dessas mídias, na proporção certa: não peça para mudar a redação deles.
 - Quadros extraídos do vídeo final (estão nas imagens deste pedido):
 {quadros}
 

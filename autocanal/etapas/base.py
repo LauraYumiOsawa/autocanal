@@ -84,6 +84,16 @@ def carregar_prompt(nome: str, **valores) -> str:
     return modelo.format(**valores)
 
 
+def json_compacto(dados) -> str:
+    """JSON numa linha, sem espaços e sem escapar acentos: dados que vão no prompt."""
+    return json.dumps(dados, ensure_ascii=False, separators=(",", ":"))
+
+
+def ler_json_opcional(ctx: Contexto, nome: str, padrao):
+    """Conteúdo de `nome` na pasta do job, ou `padrao` se o arquivo não existir."""
+    return ler_json(ctx, nome) if (ctx.pasta / nome).exists() else padrao
+
+
 def lista_md(itens: list[str], vazio: str) -> str:
     """Itens como lista Markdown (`- item`), ou `vazio` se não houver nenhum."""
     return "\n".join(f"- {i}" for i in itens) if itens else vazio

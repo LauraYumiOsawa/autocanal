@@ -16,7 +16,9 @@ from autocanal.etapas.base import (
     carregar_prompt,
     etapas_a_refazer,
     gravar_json,
+    json_compacto,
     ler_json,
+    ler_json_opcional,
     lista_md,
     titulos_recentes,
 )
@@ -196,6 +198,31 @@ def checagens(ctx: Contexto) -> list[tuple[str, str]]:
     return problemas
 
 
+CAMPOS_METADADOS = ("titulo", "texto_thumb", "cena_thumb", "descricao_final", "tags", "capitulos")
+
+
+def _dados_do_video(ctx: Contexto) -> dict[str, str]:
+    """Roteiro, transcrição, metadados e mídias compactos para o prompt (sem turnos de leitura)."""
+    roteiro = ler_json(ctx, "roteiro.json")
+    meta = ler_json(ctx, "metadados.json")
+    midias = ler_json_opcional(ctx, "fontes_midia.json", [])
+    return {
+        "roteiro": json_compacto({
+            "segmentos": [{"texto": s["texto"], "cena": s.get("cena", "")}
+                          for s in roteiro["segmentos"]],
+            "fontes": roteiro.get("fontes", []),
+        }),
+        "transcricao": json_compacto(
+            ler_json_opcional(ctx, "transcricao.json", {}).get("texto", "")),
+        "metadados": json_compacto({k: meta.get(k) for k in CAMPOS_METADADOS}),
+        "midias": json_compacto([
+            {"trecho": i, "origem": m.get("origem"), "licenca": m.get("licenca"),
+             "motivo": m.get("motivo", "")}
+            for i, m in enumerate(midias, 1)
+        ]),
+    }
+
+
 def _revisor(ctx: Contexto) -> dict:
     fmt = ctx.formato
     quadros = ctx.midia.extrair_frames(
@@ -203,6 +230,7 @@ def _revisor(ctx: Contexto) -> dict:
     )
     prompt = carregar_prompt(
         "revisao",
+        **_dados_do_video(ctx),
         tema=ctx.job.tema,
         formato=fmt.resumo,
         quadros=lista_md([str(q.relative_to(ctx.pasta)) for q in quadros], "(nenhum)"),

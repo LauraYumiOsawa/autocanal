@@ -5,7 +5,7 @@ Formato: {formato}
 
 ## Regras de trabalho
 
-1. Leia, na pasta atual, `roteiro.json` (texto falado e fontes), `transcricao.json` (o que a narração realmente disse) e `narracao.json` (início e fim de cada segmento, em segundos).
+1. Os dados do vídeo estão abaixo: o roteiro (texto falado e fontes), a transcrição (o que a narração realmente disse) e os tempos de cada segmento (início e fim, em segundos).
 2. Siga os métodos em `metodo/yt-package/SKILL.md` (título e texto da thumbnail como um par), `metodo/yt-seo/SKILL.md` (descrição, tags e consultas-alvo) e `metodo/yt-chapters/SKILL.md` (capítulos).
 3. O perfil de voz do canal, mais abaixo, **substitui** `~/.claude/youtube/voice.md`: não leia nem crie esse arquivo e não peça vídeos de referência.
 4. Não faça perguntas: ninguém vai responder. Decida sozinho. Ignore os passos dos métodos que dependem de conversa (mostrar opções, perguntar se pode publicar); a sua resposta final é só o JSON pedido.
@@ -17,6 +17,17 @@ Formato: {formato}
 8. Nunca invente números, datas, nomes ou resultados que não estejam no roteiro.
 9. Varie a estrutura e as palavras em relação aos títulos recentes do canal, listados abaixo.
 10. Se houver problemas de uma versão anterior, corrija os que dizem respeito ao título, à thumbnail, à descrição, às tags ou aos capítulos.
+
+## Dados do vídeo
+
+Roteiro (texto falado e fontes):
+{roteiro}
+
+Transcrição (o que a narração realmente disse):
+{transcricao}
+
+Tempos de cada segmento (início e fim, em segundos):
+{tempos}
 
 ## Perfil de voz do canal
 

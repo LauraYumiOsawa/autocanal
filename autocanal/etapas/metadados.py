@@ -8,7 +8,9 @@ from autocanal.etapas.base import (
     ErroEtapa,
     carregar_prompt,
     gravar_json,
+    json_compacto,
     ler_json,
+    ler_json_opcional,
     lista_md,
     perfil_voz,
     problemas_revisao,
@@ -141,6 +143,16 @@ def executar(ctx: Contexto) -> None:
     roteiro = ler_json(ctx, "roteiro.json")
     prompt = carregar_prompt(
         "metadados",
+        roteiro=json_compacto({
+            "segmentos": [{"texto": s["texto"]} for s in roteiro["segmentos"]],
+            "fontes": roteiro.get("fontes", []),
+        }),
+        transcricao=json_compacto(
+            ler_json_opcional(ctx, "transcricao.json", {}).get("texto", "")),
+        tempos=json_compacto([
+            {"inicio": s.get("inicio"), "fim": s.get("fim")}
+            for s in ler_json_opcional(ctx, "narracao.json", {}).get("segmentos", [])
+        ]),
         tema=ctx.job.tema,
         formato=fmt.resumo,
         perfil_voz=perfil_voz(ctx),

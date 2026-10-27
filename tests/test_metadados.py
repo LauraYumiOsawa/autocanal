@@ -255,3 +255,21 @@ def test_metadados_guarda_descricao_base(ctx, cfg, claude_falso):
 def test_prompt_metadados_deixa_creditos_para_o_sistema():
     texto = (Path(metadados.__file__).parents[1] / "prompts" / "metadados.md").read_text(encoding="utf-8")
     assert "avisos de IA" in texto
+
+
+def test_metadados_recebe_dados_no_prompt(ctx, cfg, claude_falso):
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    gravar_json(ctx, "roteiro.json", {
+        "segmentos": [{"texto": "o mar é salgado", "visual": "sea", "cena": "a calm sea"}],
+        "fontes": [{"afirmacao": "a", "url": URLS[0]}],
+    })
+    gravar_json(ctx, "transcricao.json", {"texto": "o mar é salgadinho", "palavras": [
+        {"texto": "mar", "inicio": 0.1, "fim": 0.4}]})
+    gravar_json(ctx, "narracao.json", {"segmentos": [{"inicio": 0.0, "fim": 2.5}], "duracao": 2.5})
+    claude_falso.responder(_ok(_metadados()))
+    metadados.executar(ctx)
+    prompt = claude_falso.chamadas()[0][2]
+    assert '"o mar é salgado"' in prompt and '"o mar é salgadinho"' in prompt
+    assert '"inicio":0.0' in prompt and '"fim":2.5' in prompt
+    assert "Leia, na pasta" not in prompt and '"palavras"' not in prompt
+    assert "a calm sea" not in prompt
