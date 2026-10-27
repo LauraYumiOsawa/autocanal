@@ -125,3 +125,25 @@ def test_cli_bancada(raiz_teste, cfg, con, job, falso):
     r = runner.invoke(cli.app, ["--raiz", str(raiz_teste), "bancada", "rodar", job.id, "visuais",
                                 "--rotulo", "x"])
     assert r.exit_code == 1 and "visuais" in r.output
+
+
+def test_primeira_versao_tira_problemas_so_da_copia(cfg, con, job, falso):
+    falso.responder(_ok(METADADOS))
+    pasta = cfg.dados / "jobs" / job.id
+    (pasta / "problemas_revisao.json").write_text('{"problemas": ["x"]}', encoding="utf-8")
+    linha = bancada.rodar(cfg, con, job.id, "metadados", "antes", agora=AGORA,
+                          primeira_versao=True)
+    assert linha["primeira_versao"] is True
+    assert (pasta / "problemas_revisao.json").exists()
+    [copia] = (cfg.dados / "bancada").glob(f"*-{job.id}-metadados-antes/jobs/{job.id}")
+    assert not (copia / "problemas_revisao.json").exists()
+
+
+def test_sem_primeira_versao_a_copia_leva_os_problemas(cfg, con, job, falso):
+    falso.responder(_ok(METADADOS))
+    pasta = cfg.dados / "jobs" / job.id
+    (pasta / "problemas_revisao.json").write_text('{"problemas": ["x"]}', encoding="utf-8")
+    linha = bancada.rodar(cfg, con, job.id, "metadados", "antes", agora=AGORA)
+    assert linha["primeira_versao"] is False
+    [copia] = (cfg.dados / "bancada").glob(f"*-{job.id}-metadados-antes/jobs/{job.id}")
+    assert (copia / "problemas_revisao.json").exists()

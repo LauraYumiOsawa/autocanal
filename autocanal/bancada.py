@@ -16,7 +16,7 @@ from pathlib import Path
 from autocanal import etapas, fila, ia
 from autocanal.config import Config
 from autocanal.db import conectar
-from autocanal.etapas.base import contexto_para
+from autocanal.etapas.base import PROBLEMAS_REVISAO, contexto_para
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
 from autocanal.texto import contar_palavras
@@ -81,10 +81,14 @@ def rodar(
     *,
     modelo: str | None = None,
     esforco: str | None = None,
+    primeira_versao: bool = False,
     registro=None,
     agora: datetime | None = None,
 ) -> dict:
-    """Roda `etapa` numa cópia isolada do job e devolve (e grava) a linha de resultado."""
+    """Roda `etapa` numa cópia isolada do job e devolve (e grava) a linha de resultado.
+
+    Com `primeira_versao`, a cópia perde `problemas_revisao.json` (o job real não muda).
+    """
     if etapa not in ETAPAS_BANCADA:
         raise ValueError(f"etapa fora da bancada: {etapa} (use {', '.join(ETAPAS_BANCADA)})")
     registro = etapas.REGISTRO if registro is None else registro
@@ -92,6 +96,8 @@ def rodar(
     job_real = fila.obter(con_real, job_id)
     base = cfg.dados / "bancada" / f"{agora:%Y%m%dT%H%M%S}-{job_id}-{etapa}-{rotulo}"
     shutil.copytree(cfg.dados / "jobs" / job_id, base / "jobs" / job_id)
+    if primeira_versao:  # só na cópia: sem os problemas, o roteiro parte do zero como na 1ª vez
+        (base / "jobs" / job_id / PROBLEMAS_REVISAO).unlink(missing_ok=True)
 
     cfg_b = cfg.model_copy(update={"dados": base}, deep=True)
     prov = cfg_b.ia.provedores[ia.provedor_de(cfg_b, etapa)]
@@ -122,6 +128,7 @@ def rodar(
         "rotulo": rotulo,
         "modelo": modelo,
         "esforco": esforco,
+        "primeira_versao": primeira_versao,
         "chamadas": soma["n"],
         "tokens_entrada": soma["ent"],
         "tokens_saida": soma["sai"],

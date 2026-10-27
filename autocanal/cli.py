@@ -526,12 +526,16 @@ def bancada_rodar(
     rotulo: str = typer.Option(..., "--rotulo", help="Nome do lado medido (ex.: antes, depois)."),
     modelo: str = typer.Option(None, "--modelo", help="Modelo só para esta etapa e execução."),
     esforco: str = typer.Option(None, "--esforco", help="Esforço só para esta etapa e execução."),
+    primeira_versao: bool = typer.Option(
+        False, "--primeira-versao",
+        help="Tira os problemas da revisão da cópia: o roteiro é escrito do zero."),
 ) -> None:
     """Roda a etapa numa cópia isolada do job e mostra tokens, custo e métricas."""
     cfg = carregar(ctx.obj)
     con = conectar(cfg.dados / "autocanal.db")
     try:
-        linha = bancada.rodar(cfg, con, job, etapa, rotulo, modelo=modelo, esforco=esforco)
+        linha = bancada.rodar(cfg, con, job, etapa, rotulo, modelo=modelo, esforco=esforco,
+                              primeira_versao=primeira_versao)
     except (ValueError, KeyError) as e:
         typer.echo(f"erro: {e}")
         raise typer.Exit(1)
