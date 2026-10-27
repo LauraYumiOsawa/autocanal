@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 import typer
 
-from autocanal import agendador, claude, fila, grade, planejador, produtor, publicador, relatorio
+from autocanal import agendador, fila, grade, ia, planejador, produtor, publicador, relatorio
 from autocanal.config import Config, carregar
 from autocanal.db import conectar
 from autocanal.fila import Estado
@@ -85,7 +85,7 @@ def diagnostico(ctx: typer.Context) -> None:
         ok, det = _executa([str(caminho), "-version"])
         resultados.append(_linha(ok, nome, det[:60]))
     for nome, cmd in (
-        ("claude", [cfg.claude.bin, "--version"]),
+        (f"ia {cfg.ia.padrao}", [cfg.ia.provedores[cfg.ia.padrao].bin, "--version"]),
         ("nvidia-smi", ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"]),
         ("docker", ["docker", "info", "--format", "{{.ServerVersion}}"]),
     ):
@@ -256,16 +256,16 @@ def novo(
 
 @app.command()
 def planejar(ctx: typer.Context) -> None:
-    """Preenche a fila com temas sugeridos pelo Claude para os slots livres da grade."""
+    """Preenche a fila com temas sugeridos pela IA para os slots livres da grade."""
     cfg = carregar(ctx.obj)
     con = conectar(cfg.dados / "autocanal.db")
     with _exclusivo(cfg):
         try:
             jobs = planejador.planejar(
                 cfg, con, datetime.now(UTC),
-                sugerir_temas=planejador.sugerir_temas_claude(cfg, con),
+                sugerir_temas=planejador.sugerir_temas(cfg, con),
             )
-        except claude.ErroClaude as e:
+        except ia.ErroIA as e:
             typer.echo(f"falha ao sugerir temas: {e}", err=True)
             raise typer.Exit(1)
     typer.echo(f"{len(jobs)} job(s) planejado(s)")
@@ -426,7 +426,7 @@ def tick(ctx: typer.Context) -> None:
     r = agendador.tick(
         cfg, con, datetime.now(UTC),
         planejar_fn=lambda c, k, agora: planejador.planejar(
-            c, k, agora, sugerir_temas=planejador.sugerir_temas_claude(c, k)
+            c, k, agora, sugerir_temas=planejador.sugerir_temas(c, k)
         ),
         produzir_fn=produtor.produzir,
         # o tick passa a hora atual de cada fase (a produção pode ter levado muito tempo)

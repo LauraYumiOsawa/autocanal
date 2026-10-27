@@ -148,7 +148,7 @@ def test_planejar_usa_claude(cfg, rodar, monkeypatch):
         return [fila.criar_job(con, "teste", "short", "t", FUTURO)]
 
     monkeypatch.setattr(cli.planejador, "planejar", planejar)
-    monkeypatch.setattr(cli.planejador, "sugerir_temas_claude", lambda cfg_, con: "claude")
+    monkeypatch.setattr(cli.planejador, "sugerir_temas", lambda cfg_, con: "claude")
     r = rodar("planejar")
     assert r.exit_code == 0, r.output
     assert recebido["sugerir"] == "claude" and "1 job" in r.output

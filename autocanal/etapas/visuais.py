@@ -6,8 +6,7 @@ import logging
 import shutil
 from pathlib import Path
 
-from autocanal import claude
-from autocanal.claude import ErroClaude, ErroClaudeIndisponivel, LimiteUsoClaude
+from autocanal import ia
 from autocanal.etapas.base import Contexto, ErroEtapa, carregar_prompt, gravar_json, ler_json
 from autocanal.etapas.metadados import atualizar_creditos
 from autocanal.provedores import flux
@@ -48,28 +47,21 @@ def _itens_md(itens: list[ItemCuradoria]) -> str:
     )
 
 
-def escolher_com_claude(ctx: Contexto) -> Escolher:
-    """Uma chamada do Claude por lote: devolve `{id: (candidato, motivo, nova_cena)}`."""
+def escolher_com_ia(ctx: Contexto) -> Escolher:
+    """Uma chamada da IA por lote: devolve `{id: (candidato, motivo, nova_cena)}`."""
 
     def escolher(itens: list[ItemCuradoria]) -> dict[str, tuple[int, str, str]]:
         prompt = carregar_prompt("curadoria", estilo=ctx.canal.estilo_visual, itens=_itens_md(itens))
         try:
-            r = claude.chamar(
-                prompt,
-                CURADORIA,
-                ["Read"],
-                ctx.pasta,
-                modelo=ctx.cfg.claude.modelos.get("curadoria"),
-                max_turns=ctx.cfg.claude.max_turns.get("curadoria", 25),
-                claude_bin=ctx.cfg.claude.bin,
-                raiz=ctx.cfg.raiz,
-            )
-        except (LimiteUsoClaude, ErroClaudeIndisponivel):
+            r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, "curadoria", ia.Pedido(
+                prompt=prompt, schema=CURADORIA, pasta=ctx.pasta,
+                imagens=tuple(i.folha for i in itens),
+            ))
+        except (ia.LimiteUso, ia.IAIndisponivel):
             raise
-        except ErroClaude as e:
+        except ia.ErroIA as e:
             # sem curadoria não há garantia de que o visual combina com a fala
             raise ErroEtapa(f"curadoria dos visuais falhou: {e}") from e
-        claude.registrar(ctx.con, ctx.job.id, "visuais", r)
         return {e["id"]: (int(e["candidato"]), e["motivo"], e.get("nova_cena", ""))
                 for e in r.dados["escolhas"]}
 
@@ -97,7 +89,7 @@ def executar(ctx: Contexto) -> None:
     pixabay = None
     chave = ctx.cfg.chaves.get("PIXABAY_API_KEY")
     if chave and "pixabay" in ctx.canal.visuais:
-        pixabay = CuradoriaPixabay(PixabayCandidatos(chave), escolher_com_claude(ctx),
+        pixabay = CuradoriaPixabay(PixabayCandidatos(chave), escolher_com_ia(ctx),
                                    ctx.canal.estilo_visual, pasta / "curadoria")
     gerador = None
     if "flux" in ctx.canal.visuais:
@@ -106,7 +98,7 @@ def executar(ctx: Contexto) -> None:
             gerador = FluxCurado(
                 GeradorFlux(ctx.cfg, job_id=ctx.job.id, rodada=ctx.job.tentativas_revisao,
                             estilo_visual=ctx.canal.estilo_visual, estilo_ia=ctx.canal.estilo_ia),
-                escolher_com_claude(ctx), pasta / "curadoria_flux", ctx.cfg.flux.variantes,
+                escolher_com_ia(ctx), pasta / "curadoria_flux", ctx.cfg.flux.variantes,
             )
         else:
             log.warning("o canal %s pede FLUX, mas servicos/flux não está instalado",

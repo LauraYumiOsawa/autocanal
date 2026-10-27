@@ -7,8 +7,7 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from autocanal import etapas, fila, servicos
-from autocanal.claude import ErroClaudeIndisponivel, LimiteUsoClaude
+from autocanal import etapas, fila, ia, servicos
 from autocanal.config import Config
 from autocanal.etapas.base import (
     PROBLEMAS_REVISAO,
@@ -22,29 +21,8 @@ from autocanal.formatos import FORMATOS
 log = logging.getLogger(__name__)
 
 MAX_TENTATIVAS_ETAPA = 3
-PAUSA_CLAUDE = timedelta(hours=1)
+PAUSA_SISTEMA = timedelta(hours=1)
 _ATIVOS = (Estado.PRODUZINDO, Estado.EM_REVISAO)
-
-
-def _marcador_pausa(cfg: Config) -> Path:
-    return cfg.dados / "pausa_claude_ate"
-
-
-def pausar_claude(cfg: Config, agora: datetime | None = None) -> datetime:
-    """Grava `dados/pausa_claude_ate` (agora + 1 h, ISO UTC) e devolve esse horário."""
-    ate = ((agora or datetime.now(UTC)) + PAUSA_CLAUDE).astimezone(UTC)
-    cfg.dados.mkdir(parents=True, exist_ok=True)
-    _marcador_pausa(cfg).write_text(ate.isoformat(), encoding="utf-8")
-    return ate
-
-
-def pausa_claude_ate(cfg: Config) -> datetime | None:
-    """Fim da pausa por limite de uso do Claude (None se não houver marcador legível)."""
-    try:
-        ate = datetime.fromisoformat(_marcador_pausa(cfg).read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return None
-    return ate.replace(tzinfo=UTC) if ate.tzinfo is None else ate
 
 
 def _marcador_sistema(cfg: Config) -> Path:
@@ -54,9 +32,10 @@ def _marcador_sistema(cfg: Config) -> Path:
 def pausar_sistema(cfg: Config, motivo: str, agora: datetime | None = None) -> datetime:
     """Grava `dados/pausa_sistema_ate` (agora + 1 h e o motivo) e devolve esse horário.
 
-    Para quedas gerais (Claude ou Docker indisponíveis): não são culpa do job.
+    Para quedas gerais (Docker indisponível): não são culpa do job. Provedor de IA
+    indisponível pausa só o provedor (`ia.pausar`).
     """
-    ate = ((agora or datetime.now(UTC)) + PAUSA_CLAUDE).astimezone(UTC)
+    ate = ((agora or datetime.now(UTC)) + PAUSA_SISTEMA).astimezone(UTC)
     cfg.dados.mkdir(parents=True, exist_ok=True)
     motivo = " ".join(motivo.split())
     _marcador_sistema(cfg).write_text(f"{ate.isoformat()}\n{motivo}\n", encoding="utf-8")
@@ -97,8 +76,9 @@ def _produzir(
     """Roda as etapas pendentes do job e devolve o estado em que ele parou.
 
     Etapas já `ok` são puladas. Um erro conta uma tentativa da etapa e encerra a
-    chamada (após `MAX_TENTATIVAS_ETAPA`, o job vai para `falhou`); o limite de uso do
-    Claude encerra sem contar tentativa e grava a pausa de 1 h (`pausar_claude`). Se a
+    chamada (após `MAX_TENTATIVAS_ETAPA`, o job vai para `falhou`); limite de uso ou
+    indisponibilidade de um provedor de IA encerra sem contar tentativa (a pausa do provedor
+    já foi gravada por `ia.chamar`). Se a
     revisão devolver o job para `produzindo`, o percurso recomeça na mesma chamada; se
     ela terminar sem decidir (job ainda `em_revisao`), conta como erro da etapa.
     """
@@ -140,13 +120,12 @@ def _produzir(
                 etapa(ctx)
                 if nome == "revisao" and fila.obter(con, job_id).estado == Estado.EM_REVISAO:
                     raise ErroEtapa("revisão não decidiu")
-            except LimiteUsoClaude:
-                ate = pausar_claude(cfg)
-                log.warning("limite de uso do Claude em %s/%s; produção pausada até %s",
-                            job_id, nome, ate.isoformat())
+            except (ia.LimiteUso, ia.IAIndisponivel) as e:
+                log.warning("IA parada em %s/%s (%s); a etapa espera a pausa do provedor",
+                            job_id, nome, e)
                 fila.restaurar_etapa(con, job_id, nome, anterior)
                 return fila.obter(con, job_id).estado
-            except (ErroClaudeIndisponivel, servicos.ServicoIndisponivel) as e:
+            except servicos.ServicoIndisponivel as e:
                 ate = pausar_sistema(cfg, str(e))
                 log.warning("queda geral em %s/%s (%s); produção pausada até %s",
                             job_id, nome, e, ate.isoformat())

@@ -12,8 +12,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from autocanal import fila, grade, planejador, produtor, relatorio
-from autocanal.claude import ErroClaudeIndisponivel, LimiteUsoClaude
+from autocanal import fila, grade, ia, planejador, produtor, relatorio
 from autocanal.config import Config
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
@@ -71,17 +70,15 @@ def fila_curta(cfg: Config, con: sqlite3.Connection, agora: datetime) -> bool:
     return False
 
 
-def _pausa_ativa(cfg: Config, agora: datetime) -> datetime | None:
-    """Fim da pausa vigente (limite do Claude ou queda geral), ou None."""
-    fins = [produtor.pausa_claude_ate(cfg)]
+def _pausa_sistema(cfg: Config, agora: datetime) -> datetime | None:
+    """Fim da pausa por queda geral (Docker), ou None. Pausa de provedor de IA não para a
+    produção: o job anda até a primeira etapa que depende do provedor pausado."""
     sistema = produtor.pausa_sistema(cfg)
-    fins.append(sistema[0] if sistema else None)
-    ativos = [f for f in fins if f is not None and agora < f]
-    return max(ativos) if ativos else None
+    return sistema[0] if sistema and agora < sistema[0] else None
 
 
-def _claude_livre(cfg: Config, agora: datetime) -> bool:
-    return _pausa_ativa(cfg, agora) is None
+def _temas_livre(cfg: Config, agora: datetime) -> bool:
+    return _pausa_sistema(cfg, agora) is None and ia.livre(cfg, "temas", agora)
 
 
 def _planejar_liberado(cfg: Config, agora: datetime) -> bool:
@@ -107,8 +104,9 @@ def tick(
     partir das 07:00 locais, uma vez; (4) planeja se a fila estiver curta; (5) produz o
     próximo job. Publicar e resumir vêm antes da produção, que pode levar dezenas de
     minutos (ou travar). O planejamento usa `agora` (início do tick); as outras fases
-    leem `relogio()` na hora. Planejar espera a pausa do Claude e o recuo após falha
-    (`planejador.planejar_apos`); produzir espera a pausa. Erro numa fase é
+    leem `relogio()` na hora. Planejar espera a pausa do provedor de `temas`, a queda geral
+    e o recuo após falha (`planejador.planejar_apos`); produzir espera só a queda geral (o
+    job para sozinho na etapa cujo provedor de IA está pausado). Erro numa fase é
     registrado no log e não impede as seguintes.
     """
     try:
@@ -141,20 +139,16 @@ def _passo(cfg, con, agora, relogio, planejar_fn, produzir_fn, publicar_fn, sinc
         log.exception("tick: falha ao gerar o resumo")
 
     try:
-        if (_claude_livre(cfg, agora) and _planejar_liberado(cfg, agora)
+        if (_temas_livre(cfg, agora) and _planejar_liberado(cfg, agora)
                 and fila_curta(cfg, con, agora)):
             r.planejados = len(planejar_fn(cfg, con, agora))
-    except LimiteUsoClaude:
-        ate = produtor.pausar_claude(cfg, agora)
-        log.warning("limite de uso do Claude ao planejar; pausa até %s", ate.isoformat())
-    except ErroClaudeIndisponivel as e:
-        ate = produtor.pausar_sistema(cfg, str(e), agora)
-        log.warning("Claude indisponível ao planejar (%s); pausa até %s", e, ate.isoformat())
+    except (ia.LimiteUso, ia.IAIndisponivel) as e:
+        log.warning("IA parada ao planejar (%s); o provedor ficou pausado", e)
     except Exception:
         log.exception("tick: falha ao planejar")
 
     try:
-        if (ate := _pausa_ativa(cfg, relogio())) is not None:
+        if (ate := _pausa_sistema(cfg, relogio())) is not None:
             log.info("produção em pausa até %s: pulada", ate.isoformat())
         elif (job := fila.proximo_para_produzir(con)) is not None:
             r.produzido = job.id

@@ -2,16 +2,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from autocanal import etapas, fila
-from autocanal.claude import ErroClaudeIndisponivel, LimiteUsoClaude
+from autocanal import etapas, fila, ia
+from autocanal.ia import IAIndisponivel, LimiteUso
 from autocanal.db import conectar
 from autocanal.fila import Estado
 from autocanal.formatos import FORMATOS
 from autocanal.produtor import (
     MAX_TENTATIVAS_ETAPA,
-    pausa_claude_ate,
     pausa_sistema,
-    pausar_claude,
     produzir,
 )
 from autocanal.servicos import ServicoIndisponivel
@@ -94,29 +92,41 @@ def test_produzir_falha_apos_tres_tentativas(cfg, con, job):
     assert len(chamadas) == 4
 
 
-def test_produzir_limite_uso_nao_conta_tentativa(cfg, con, job):
+@pytest.mark.parametrize("erro", [
+    LimiteUso("claude", "Claude usage limit reached"),
+    IAIndisponivel("claude", "não consegui executar claude: FileNotFoundError"),
+])
+def test_produzir_ia_parada_nao_conta_tentativa(cfg, con, job, erro):
     chamadas: list[str] = []
 
-    def limite(ctx):
+    def parada(ctx):
         chamadas.append("roteiro")
-        raise LimiteUsoClaude("Claude usage limit reached")
+        raise erro
 
-    assert pausa_claude_ate(cfg) is None
-    estado = produzir(cfg, con, job.id, registro=_registro(chamadas, roteiro=limite))
+    estado = produzir(cfg, con, job.id, registro=_registro(chamadas, roteiro=parada))
     assert estado == Estado.PRODUZINDO
     assert fila.obter(con, job.id).estado == Estado.PRODUZINDO
     assert fila.tentativas_etapa(con, job.id, "roteiro") == 0
     assert fila.estado_etapa(con, job.id, "roteiro") != "ok"
     assert chamadas == ["roteiro"]
-    # spec §11: limite de uso adia a produção por 1 h (o tick respeita o marcador)
-    ate = pausa_claude_ate(cfg)
-    esperado = datetime.now(UTC) + timedelta(hours=1)
-    assert abs(ate - esperado) < timedelta(seconds=30)
-    assert (cfg.dados / "pausa_claude_ate").read_text() == ate.isoformat()
+    # a pausa do provedor é gravada por ia.chamar; o produtor não pausa o sistema
+    assert pausa_sistema(cfg) is None
+
+
+def test_produzir_etapas_sem_ia_andam_antes_da_pausada(cfg, con, job):
+    chamadas: list[str] = []
+
+    def parada(ctx):
+        chamadas.append("metadados")
+        raise LimiteUso("claude", "pausado")
+
+    produzir(cfg, con, job.id, registro=_registro(chamadas, metadados=parada))
+    i = ETAPAS.index("metadados")
+    assert all(fila.estado_etapa(con, job.id, n) == "ok" for n in ETAPAS[:i])
+    assert fila.tentativas_etapa(con, job.id, "metadados") == 0
 
 
 @pytest.mark.parametrize("erro", [
-    ErroClaudeIndisponivel("não consegui executar claude: FileNotFoundError"),
     ServicoIndisponivel("não consegui subir o serviço kokoro: CalledProcessError"),
 ])
 def test_produzir_queda_geral_pausa_sem_contar_tentativa(cfg, con, job, erro):
@@ -136,7 +146,7 @@ def test_produzir_queda_geral_pausa_sem_contar_tentativa(cfg, con, job, erro):
     ate, motivo = pausa_sistema(cfg)
     assert abs(ate - (datetime.now(UTC) + timedelta(hours=1))) < timedelta(seconds=30)
     assert motivo == str(erro)
-    assert pausa_claude_ate(cfg) is None
+    assert ia.pausas(cfg, datetime.now(UTC)) == {}
 
 
 def test_produzir_etapa_rodando_conta_como_interrompida(cfg, con, job):
@@ -175,15 +185,6 @@ def test_produzir_para_o_kokoro_se_narrou(cfg, con, job, monkeypatch):
     assert paradas == [("kokoro", cfg.raiz)]
     produzir(cfg, con, job.id, registro=_registro([]))  # nada a fazer: não mexe no Docker
     assert len(paradas) == 1
-
-
-def test_pausa_claude_ate_ilegivel(cfg):
-    cfg.dados.mkdir(parents=True, exist_ok=True)
-    (cfg.dados / "pausa_claude_ate").write_text("lixo")
-    assert pausa_claude_ate(cfg) is None
-    agora = datetime(2026, 10, 26, 12, tzinfo=UTC)
-    assert pausar_claude(cfg, agora) == agora + timedelta(hours=1)
-    assert pausa_claude_ate(cfg) == agora + timedelta(hours=1)
 
 
 def test_produzir_refazer_volta_a_produzir(cfg, con, job):

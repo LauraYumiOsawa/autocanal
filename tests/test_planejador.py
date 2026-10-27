@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from autocanal import fila, planejador
-from autocanal.claude import ErroClaude, LimiteUsoClaude
+from autocanal.ia import ErroIA, LimiteUso
 from autocanal.db import conectar
 from autocanal.fila import Estado
 
@@ -102,7 +102,7 @@ def test_planejar_isola_falha_por_canal_e_adia(cfg_nicho, con, caplog):
     def sugerir(canal, formato, n):
         pedidos.append(canal.slug)
         if canal.slug == "teste":
-            raise ErroClaude("falhou após 3 tentativas")
+            raise ErroIA("claude", "falhou após 3 tentativas")
         return [f"t{i}" for i in range(n)]
 
     with caplog.at_level(logging.WARNING, logger="autocanal.planejador"):
@@ -119,11 +119,11 @@ def test_planejar_isola_falha_por_canal_e_adia(cfg_nicho, con, caplog):
     assert {j.canal for j in fila.listar(con)} == {"teste", "outro"}
 
 
-def test_planejar_limite_do_claude_propaga(cfg_nicho, con):
+def test_planejar_limite_de_uso_propaga(cfg_nicho, con):
     def sugerir(canal, formato, n):
-        raise LimiteUsoClaude("usage limit reached")
+        raise LimiteUso("claude", "usage limit reached")
 
-    with pytest.raises(LimiteUsoClaude):
+    with pytest.raises(LimiteUso):
         planejador.planejar(cfg_nicho, con, AGORA, sugerir_temas=sugerir)
     assert planejador.planejar_apos(cfg_nicho) is None
 
@@ -135,9 +135,9 @@ def _ok(dados):
     }
 
 
-def test_sugerir_temas_claude(cfg_nicho, con, claude_falso):
+def test_sugerir_temas(cfg_nicho, con, claude_falso):
     cfg = cfg_nicho
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     antigo = fila.criar_job(con, "teste", "short", "tema antigo", datetime(2026, 10, 1, tzinfo=UTC))
     pasta = cfg.dados / "jobs" / antigo.id
     pasta.mkdir(parents=True)
@@ -148,11 +148,11 @@ def test_sugerir_temas_claude(cfg_nicho, con, claude_falso):
         {"tema": " Raios ", "angulo": " "},
     ]}))
 
-    temas = planejador.sugerir_temas_claude(cfg, con)(cfg.canais["teste"], "short", 2)
+    temas = planejador.sugerir_temas(cfg, con)(cfg.canais["teste"], "short", 2)
 
     assert temas == ["Por que o céu é azul — o erro que a escola ensina", "Raios"]
     argv = claude_falso.chamadas()[0]
-    assert argv[argv.index("--allowedTools") + 1:] == ["Skill", "Read", "WebSearch", "WebFetch"]
+    assert argv[argv.index("--allowedTools") + 1:] == ["Read", "WebSearch", "WebFetch"]
     assert f"Read(/{Path.home()}/.claude/**)" in argv
     assert argv[argv.index("--model") + 1] == "sonnet"
     assert argv[argv.index("--max-turns") + 1] == "15"
@@ -163,5 +163,5 @@ def test_sugerir_temas_claude(cfg_nicho, con, claude_falso):
     for trecho in ("youtube-agent:yt-plan", "curiosidades de ciência", "Título que já saiu",
                    "tema já usado", "Não faça perguntas"):
         assert trecho in prompt
-    r = con.execute("SELECT job_id, etapa FROM chamadas_claude").fetchall()
+    r = con.execute("SELECT job_id, etapa FROM chamadas_ia").fetchall()
     assert [tuple(x) for x in r] == [(None, "temas")]

@@ -1,8 +1,8 @@
-"""Etapa metadados: Claude (yt-package, yt-seo, yt-chapters) escreve título, descrição e tags."""
+"""Etapa metadados: a IA (yt-package, yt-seo, yt-chapters) escreve título, descrição e tags."""
 from __future__ import annotations
 
 # módulo, não a função: `ferramentas_plugin` importa `etapas.base` (import circular)
-from autocanal import claude, ferramentas_plugin
+from autocanal import ferramentas_plugin, ia
 from autocanal.etapas.base import (
     Contexto,
     ErroEtapa,
@@ -16,10 +16,6 @@ from autocanal.etapas.base import (
 )
 from autocanal.texto import sanitizar_texto
 
-def ferramentas(ctx: Contexto) -> list[str]:
-    """Ferramentas do Claude: Bash só para o linter de título do plugin."""
-    script = ctx.cfg.plugin_dir / "skills" / "yt-package" / "title.py"
-    return ["Skill", "Read", f"Bash(python3 {script}:*)"]
 LIMITE_TAGS = 500
 LIMITE_DESCRICAO_BYTES = 5000
 
@@ -152,17 +148,8 @@ def executar(ctx: Contexto) -> None:
         problemas_anteriores=lista_md(problemas_revisao(ctx), "Nenhum: esta é a primeira versão."),
         dir_plugin=ctx.cfg.plugin_dir,
     )
-    r = claude.chamar(
-        prompt,
-        METADADOS,
-        ferramentas(ctx),
-        ctx.pasta,
-        modelo=ctx.cfg.claude.modelos.get("metadados"),
-        max_turns=ctx.cfg.claude.max_turns.get("metadados", 20),
-        claude_bin=ctx.cfg.claude.bin,
-        raiz=ctx.cfg.raiz,
-    )
-    claude.registrar(ctx.con, ctx.job.id, "metadados", r)
+    r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, "metadados",
+                  ia.Pedido(prompt=prompt, schema=METADADOS, pasta=ctx.pasta))
     d = r.dados
     titulo = sanitizar_texto(d["titulo"]).strip()
     if not titulo:

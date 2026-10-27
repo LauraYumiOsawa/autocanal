@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 Dia = Literal["seg", "ter", "qua", "qui", "sex", "sab", "dom"]
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -67,10 +67,38 @@ class Canal(BaseModel):
     estilo_ia: str = ""
 
 
-class ConfigClaude(BaseModel):
-    bin: str = "claude"
-    modelos: dict[str, str | None]
-    max_turns: dict[str, int]
+ETAPAS_IA = ("roteiro", "curadoria", "metadados", "revisao", "temas")
+
+
+def _etapas_conhecidas(chaves, onde: str) -> None:
+    desconhecidas = sorted(set(chaves) - set(ETAPAS_IA))
+    if desconhecidas:
+        raise ValueError(f"etapa(s) desconhecida(s) em {onde}: {', '.join(desconhecidas)}")
+
+
+class ConfigProvedor(BaseModel):
+    bin: str
+    modelos: dict[str, str | None] = {}
+
+
+class ConfigIA(BaseModel):
+    """Provedor de IA por etapa: `padrao` vale para as etapas fora de `etapas`."""
+
+    padrao: str = "claude"
+    etapas: dict[str, str] = {}
+    max_turns: dict[str, int] = {}
+    provedores: dict[str, ConfigProvedor]
+
+    @model_validator(mode="after")
+    def _coerente(self) -> ConfigIA:
+        _etapas_conhecidas(self.etapas, "ia.etapas")
+        _etapas_conhecidas(self.max_turns, "ia.max_turns")
+        for nome, prov in self.provedores.items():
+            _etapas_conhecidas(prov.modelos, f"ia.provedores.{nome}.modelos")
+        for usado in {self.padrao, *self.etapas.values()}:
+            if usado not in self.provedores:
+                raise ValueError(f"provedor {usado} sem entrada em ia.provedores")
+        return self
 
 
 class ConfigWhisper(BaseModel):
@@ -116,7 +144,7 @@ class Config(BaseModel):
     client_secret: Path
     kokoro_url: str
     kokoro_timeout_s: int = 600  # o contêiner leva ~4 min para carregar o modelo na CPU
-    claude: ConfigClaude
+    ia: ConfigIA
     whisper: ConfigWhisper = ConfigWhisper()
     revisao: ConfigRevisao = ConfigRevisao()
     flux: ConfigFlux = ConfigFlux()
@@ -149,8 +177,8 @@ def _ler_segredos(arquivo: Path) -> dict[str, str]:
     return chaves
 
 
-def resolver_bin_claude(valor: str) -> str:
-    """Caminho absoluto do CLI do Claude (o systemd não tem o PATH do shell).
+def resolver_bin(valor: str) -> str:
+    """Caminho absoluto do CLI de um provedor de IA (o systemd não tem o PATH do shell).
 
     Absoluto fica como está; senão `shutil.which`; senão `~/.local/bin/<valor>`.
     """
@@ -182,9 +210,14 @@ def carregar(raiz: Path) -> Config:
     flux_cfg["projeto"] = _caminho(raiz, flux_cfg.get("projeto", "servicos/flux"))
     base["flux"] = flux_cfg
 
-    claude_cfg = dict(base.get("claude") or {})
-    claude_cfg["bin"] = resolver_bin_claude(str(claude_cfg.get("bin") or "claude"))
-    base["claude"] = claude_cfg
+    if "claude" in base:
+        raise ValueError("o bloco `claude:` virou `ia:`; veja `config/autocanal.yaml`")
+    ia_cfg = dict(base.get("ia") or {})
+    ia_cfg["provedores"] = {
+        nome: {**dados, "bin": resolver_bin(str(dados.get("bin") or nome))}
+        for nome, dados in (ia_cfg.get("provedores") or {}).items()
+    }
+    base["ia"] = ia_cfg
 
     chaves = _ler_segredos(raiz / "config" / "segredos.env")
     return Config(

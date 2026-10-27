@@ -1,7 +1,7 @@
-"""Etapa roteiro: Claude (skill yt-script) escreve o roteiro com fontes."""
+"""Etapa roteiro: a IA (método yt-script) escreve o roteiro com fontes."""
 from __future__ import annotations
 
-from autocanal import claude
+from autocanal import ia
 from autocanal.etapas.base import (
     Contexto,
     ErroEtapa,
@@ -13,11 +13,6 @@ from autocanal.etapas.base import (
     titulos_recentes,
 )
 from autocanal.texto import contar_palavras
-
-def ferramentas(ctx: Contexto) -> list[str]:
-    """Ferramentas do Claude: Bash só para o script de nota de gancho do plugin."""
-    script = ctx.cfg.plugin_dir / "skills" / "yt-script" / "hookscore.py"
-    return ["Skill", "Read", f"Bash(python3 {script}:*)", "WebSearch", "WebFetch"]
 
 _TEXTO = {"type": "string"}
 MAX_SEGMENTOS = 60
@@ -113,17 +108,8 @@ def executar(ctx: Contexto) -> None:
         problemas_anteriores=lista_md(problemas_revisao(ctx), "Nenhum: esta é a primeira versão."),
         dir_plugin=ctx.cfg.plugin_dir,
     )
-    r = claude.chamar(
-        prompt,
-        schema,
-        ferramentas(ctx),
-        ctx.pasta,
-        modelo=ctx.cfg.claude.modelos.get("roteiro"),
-        max_turns=ctx.cfg.claude.max_turns.get("roteiro", 20),
-        claude_bin=ctx.cfg.claude.bin,
-        raiz=ctx.cfg.raiz,
-    )
-    claude.registrar(ctx.con, ctx.job.id, "roteiro", r)
+    r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, "roteiro",
+                  ia.Pedido(prompt=prompt, schema=schema, pasta=ctx.pasta, web=True))
     dados = achatar(r.dados) if "secoes" in r.dados else r.dados
     palavras = contar_palavras(" ".join(s["texto"] for s in dados["segmentos"]))
     if not fmt.palavras_min <= palavras <= fmt.palavras_max:

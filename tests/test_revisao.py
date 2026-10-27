@@ -23,7 +23,7 @@ TEXTOS = [
     "A água evapora, mas o sal fica para trás e se acumula.",
     "Por isso cada litro de água do mar tem cerca de trinta e cinco gramas de sal.",
 ]
-FERRAMENTAS_REVISOR = ["Read", "WebFetch", "WebSearch"]
+FERRAMENTAS_REVISOR = ["Read", "WebSearch", "WebFetch"]
 
 
 def _video(midia: Midia, destino: Path, duracao: int, tamanho="1080x1920", audio="tom"):
@@ -233,7 +233,7 @@ def test_similaridade_ignora_descartados(ctx, cfg, con):
 
 
 def test_checagens_ok_chama_claude_e_aprova(ctx, cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     _outro_job(cfg, con, "teste", _roteiro(["Assunto diferente, nada a ver."]), "Céu azul em 40 s")
     claude_falso.responder(_parecer(True, sintetico=True))
     revisao.executar(ctx)
@@ -253,15 +253,28 @@ def test_checagens_ok_chama_claude_e_aprova(ctx, cfg, con, claude_falso):
     prompt = argv[2]
     assert "revisao/quadros/quadro_01.jpg" in prompt and "revisao/quadros/quadro_06.jpg" in prompt
     assert "Céu azul em 40 s" in prompt and "por que o mar é salgado" in prompt
+    imagens = prompt.split("Imagens deste pedido, na ordem:\n", 1)[1].splitlines()
+    assert imagens == [f"{i}. `revisao/quadros/quadro_{i:02d}.jpg`" for i in range(1, 7)]
     n = con.execute(
-        "SELECT COUNT(*) FROM chamadas_claude WHERE job_id = ? AND etapa = 'revisao'",
+        "SELECT COUNT(*) FROM chamadas_ia WHERE job_id = ? AND etapa = 'revisao'",
         (ctx.job.id,),
     ).fetchone()[0]
     assert n == 1
 
 
+def test_revisor_recebe_thumbnail_nas_imagens(ctx, cfg, con, claude_falso):
+    from PIL import Image
+
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    Image.new("RGB", (1280, 720)).save(ctx.pasta / "thumbnail.jpg")
+    claude_falso.responder(_parecer(True))
+    revisao.executar(ctx)
+    [argv] = claude_falso.chamadas()
+    assert argv[2].endswith("\n7. `thumbnail.jpg`")
+
+
 def test_reprovado_primeira_rodada_refaz(ctx, cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(_parecer(False, "visuais", problemas=["imagem não combina"]))
     revisao.executar(ctx)
 
@@ -288,7 +301,7 @@ def test_etapas_a_refazer():
 
 
 def test_reprovado_sem_etapa_refaz_tudo(ctx, cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(_parecer(False, None, problemas=["sem valor próprio"]))
     revisao.executar(ctx)
     assert fila.obter(con, ctx.job.id).estado == Estado.PRODUZINDO
@@ -297,7 +310,7 @@ def test_reprovado_sem_etapa_refaz_tudo(ctx, cfg, con, claude_falso):
 
 
 def test_segunda_reprovacao_quarentena(ctx, cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     fila.atualizar(con, ctx.job.id, tentativas_revisao=1)
     claude_falso.responder(_parecer(False, "metadados", problemas=["título enganoso"]))
     revisao.executar(ctx)
@@ -311,7 +324,7 @@ def test_segunda_reprovacao_quarentena(ctx, cfg, con, claude_falso):
 
 
 def test_checagem_falha_nao_chama_claude(ctx, cfg, con, claude_falso, videos):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     shutil.copy(videos["longo"], ctx.pasta / "video.mp4")
     _titulo_fraco(ctx, cfg, con, videos)
     revisao.executar(ctx)
@@ -328,7 +341,7 @@ def test_checagem_falha_nao_chama_claude(ctx, cfg, con, claude_falso, videos):
 
 
 def test_reprovacao_refaz_so_as_etapas_resetadas(ctx, cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(_parecer(False, "visuais", problemas=["imagem fora"]), _parecer(True))
     chamadas: list[str] = []
 
@@ -379,7 +392,7 @@ def test_checagens_render_e_titulo_refazem_metadados(ctx, cfg, con, videos):
 
 
 def test_revisor_pede_metadados_junto_com_visuais(ctx, cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(_parecer(
         False, "visuais", problemas=["imagem não combina", "título vago"],
         refazer_metadados=True))
@@ -392,7 +405,7 @@ def test_revisor_pede_metadados_junto_com_visuais(ctx, cfg, con, claude_falso):
 
 
 def test_revisao_nao_desliga_sintetico(ctx, cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     meta = ler_json(ctx, "metadados.json")
     gravar_json(ctx, "metadados.json", {**meta, "sintetico": True})  # mídia do FLUX
     claude_falso.responder(_parecer(True, sintetico=False))

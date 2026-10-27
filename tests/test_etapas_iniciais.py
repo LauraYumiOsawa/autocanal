@@ -130,7 +130,7 @@ def test_template_tem_todos_os_campos():
 
 
 def test_roteiro_grava_json_e_valida_palavras(ctx, cfg, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(_ok(_roteiro(20)), _ok(_roteiro(100)))
     with pytest.raises(ErroEtapa, match="20 palavras"):
         roteiro.executar(ctx)
@@ -141,20 +141,20 @@ def test_roteiro_grava_json_e_valida_palavras(ctx, cfg, claude_falso):
     argv = claude_falso.chamadas()[-1]
     script = cfg.plugin_dir / "skills" / "yt-script" / "hookscore.py"
     assert argv[argv.index("--allowedTools") + 1:] == [
-        "Skill", "Read", f"Bash(python3 {script}:*)", "WebSearch", "WebFetch"
+        "Read", "WebSearch", "WebFetch"
     ]
     assert f"Read(/{cfg.raiz.resolve()}/dados/tokens/**)" in argv
     assert argv[argv.index("--max-turns") + 1] == "30"
     assert "--model" not in argv
     n = ctx.con.execute(
-        "SELECT COUNT(*) FROM chamadas_claude WHERE job_id = ? AND etapa = 'roteiro'",
+        "SELECT COUNT(*) FROM chamadas_ia WHERE job_id = ? AND etapa = 'roteiro'",
         (ctx.job.id,),
     ).fetchone()[0]
     assert n == 2
 
 
 def test_roteiro_inclui_problemas_anteriores(ctx, cfg, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(_ok(_roteiro(100)), _ok(_roteiro(100)))
     roteiro.executar(ctx)
     primeiro = claude_falso.chamadas()[0][2]
@@ -346,13 +346,13 @@ def _itens_curadoria(ctx, n=1):
     return [ItemCuradoria("seg_01", "o roteador do vizinho", "a router on a shelf", folha, n)]
 
 
-def test_escolher_com_claude_usa_modelo_e_read(ctx, cfg, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+def test_escolher_com_ia_usa_modelo_e_read(ctx, cfg, claude_falso):
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(_ok({"escolhas": [
         {"id": "seg_01", "candidato": 2, "motivo": "roteador"},
         {"id": "seg_02", "candidato": 0, "motivo": "texto na tela", "nova_cena": "a router alone"}]}))
     itens = _itens_curadoria(ctx, n=3)
-    assert visuais.escolher_com_claude(ctx)(itens) == {
+    assert visuais.escolher_com_ia(ctx)(itens) == {
         "seg_01": (2, "roteador", ""), "seg_02": (0, "texto na tela", "a router alone")}
     argv = claude_falso.chamadas()[-1]
     assert argv[argv.index("--model") + 1] == "sonnet"
@@ -361,26 +361,27 @@ def test_escolher_com_claude_usa_modelo_e_read(ctx, cfg, claude_falso):
     prompt = argv[2]
     assert "o roteador do vizinho" in prompt and "a router on a shelf" in prompt
     assert str(itens[0].folha) in prompt
-    n = ctx.con.execute("SELECT COUNT(*) FROM chamadas_claude WHERE job_id = ? AND etapa = 'visuais'",
+    assert prompt.endswith("\n\nImagens deste pedido, na ordem:\n1. `visuais/curadoria/seg_01.jpg`")
+    n = ctx.con.execute("SELECT COUNT(*) FROM chamadas_ia WHERE job_id = ? AND etapa = 'curadoria'",
                         (ctx.job.id,)).fetchone()[0]
     assert n == 1
 
 
 def test_escolher_erro_claude_vira_erro_etapa(ctx, cfg, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder({"type": "result", "subtype": "error_max_turns", "is_error": True,
                             "result": "acabaram os turnos"})
     with pytest.raises(ErroEtapa, match="curadoria"):
-        visuais.escolher_com_claude(ctx)(_itens_curadoria(ctx))
+        visuais.escolher_com_ia(ctx)(_itens_curadoria(ctx))
 
 
 def test_escolher_limite_uso_propaga(ctx, cfg, claude_falso):
-    from autocanal.claude import LimiteUsoClaude
-    cfg.claude.bin = claude_falso.claude_bin
+    from autocanal.ia import LimiteUso
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder({"type": "result", "subtype": "success", "is_error": True,
                             "result": "You've hit your session limit · resets 5am"})
-    with pytest.raises(LimiteUsoClaude):
-        visuais.escolher_com_claude(ctx)(_itens_curadoria(ctx))
+    with pytest.raises(LimiteUso):
+        visuais.escolher_com_ia(ctx)(_itens_curadoria(ctx))
 
 
 def test_visuais_usa_curadoria_com_chave(ctx, cfg, monkeypatch):
@@ -408,7 +409,7 @@ def test_visuais_usa_curadoria_com_chave(ctx, cfg, monkeypatch):
 
     cfg.chaves["PIXABAY_API_KEY"] = "k"
     monkeypatch.setattr(visuais, "PixabayCandidatos", Fonte)
-    monkeypatch.setattr(visuais, "escolher_com_claude",
+    monkeypatch.setattr(visuais, "escolher_com_ia",
                         lambda ctx: (lambda itens: {i.id: (1, "combina") for i in itens}))
     _segmentos(ctx, ["a b", "c d"], ["ocean", "city"])
     visuais.executar(ctx)
@@ -444,7 +445,7 @@ def test_achatar_mais_de_60_falha():
 
 
 def test_roteiro_medio_usa_prompt_e_schema(cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     job = fila.criar_job(con, "teste", "medio", "por que o mar é salgado", PUBLICAR)
     c = contexto_para(cfg, con, job)
     claude_falso.responder(_ok(_roteiro_medio((4, 4, 4), 40)))  # 480 palavras
@@ -508,7 +509,7 @@ def test_visuais_libera_memoria_antes_do_flux(ctx, cfg, monkeypatch):
     cfg.canais["teste"].visuais = ["flux"]
     gerador = _FluxRegistra(eventos)
     monkeypatch.setattr(visuais, "GeradorFlux", gerador)
-    monkeypatch.setattr(visuais, "escolher_com_claude",
+    monkeypatch.setattr(visuais, "escolher_com_ia",
                         lambda ctx: (lambda itens: {i.id: (1, "sem defeitos") for i in itens}))
     monkeypatch.setattr(mod_legendas, "liberar_modelos", lambda: eventos.append("whisper"))
     monkeypatch.setattr(servicos, "parar_kokoro", lambda raiz: eventos.append("kokoro"))
@@ -539,7 +540,7 @@ def test_visuais_refeitos_atualizam_creditos_e_sintetico(ctx, cfg, monkeypatch):
     _instalar_flux_falso(cfg)
     cfg.canais["teste"].visuais = ["flux"]
     monkeypatch.setattr(visuais, "GeradorFlux", _FluxRegistra([]))
-    monkeypatch.setattr(visuais, "escolher_com_claude",
+    monkeypatch.setattr(visuais, "escolher_com_ia",
                         lambda ctx: (lambda itens: {i.id: (1, "ok") for i in itens}))
     monkeypatch.setattr(mod_legendas, "liberar_modelos", lambda: None)
     monkeypatch.setattr(servicos, "parar_kokoro", lambda raiz: None)

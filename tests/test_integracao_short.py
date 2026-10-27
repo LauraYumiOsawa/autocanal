@@ -51,7 +51,7 @@ class BancoFalso:
 
 
 def test_short_offline_gera_mp4_valido(cfg, claude_falso, monkeypatch):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(
         _ok(_roteiro()),
         _ok({"titulo": "Por que o mar é salgado? 3 motivos", "texto_thumb": "SAL ESCONDIDO",

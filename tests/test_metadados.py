@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import pytest
 
 from autocanal import etapas, fila
-from autocanal.claude import ErroClaude
+from autocanal.ia import ErroIA
 from autocanal.db import conectar
 from autocanal.etapas import metadados
 from autocanal.etapas.base import ErroEtapa, contexto_para, gravar_json, ler_json
@@ -104,7 +104,7 @@ def test_nota_titulo_sem_script_falha(cfg, tmp_path):
 
 
 def test_metadados_grava_json(ctx, cfg, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     gravar_json(ctx, "roteiro.json", {
         "segmentos": [{"texto": "o mar é salgado", "visual": "sea"}],
         "fontes": [{"afirmacao": "a", "url": URLS[0]}, {"afirmacao": "b", "url": URLS[1]},
@@ -134,7 +134,7 @@ def test_metadados_grava_json(ctx, cfg, claude_falso):
     argv = claude_falso.chamadas()[0]
     script = cfg.plugin_dir / "skills" / "yt-package" / "title.py"
     assert argv[argv.index("--allowedTools") + 1:] == [
-        "Skill", "Read", f"Bash(python3 {script}:*)"
+        "Read"
     ]
     assert f"Read(/{cfg.raiz.resolve()}/config/**)" in argv
     assert argv[argv.index("--model") + 1] == "sonnet"
@@ -143,18 +143,18 @@ def test_metadados_grava_json(ctx, cfg, claude_falso):
     assert "por que o mar é salgado" in prompt and "título fraco" in prompt
     assert f"{cfg.plugin_dir}/skills/yt-package/title.py --json" in prompt
     n = ctx.con.execute(
-        "SELECT COUNT(*) FROM chamadas_claude WHERE job_id = ? AND etapa = 'metadados'",
+        "SELECT COUNT(*) FROM chamadas_ia WHERE job_id = ? AND etapa = 'metadados'",
         (ctx.job.id,),
     ).fetchone()[0]
     assert n == 1
 
 
 def test_metadados_rejeita_schema_invalido(ctx, cfg, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     gravar_json(ctx, "roteiro.json", {"segmentos": [], "fontes": []})
     ruim = _ok(_metadados(consultas_alvo=["só uma"]))
     claude_falso.responder(ruim, ruim, ruim)
-    with pytest.raises(ErroClaude, match="schema"):
+    with pytest.raises(ErroIA, match="schema"):
         metadados.executar(ctx)
     assert not (ctx.pasta / "metadados.json").exists()
 
@@ -164,7 +164,7 @@ def test_metadados_rejeita_schema_invalido(ctx, cfg, claude_falso):
     ({"descricao": "é" * 4500}, "bytes"),  # 4500 caracteres, 9000 bytes
 ])
 def test_metadados_limites_do_youtube(ctx, cfg, claude_falso, extra, erro):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     gravar_json(ctx, "roteiro.json", {"segmentos": [], "fontes": []})
     claude_falso.responder(_ok(_metadados(**extra)))
     with pytest.raises(ErroEtapa, match=erro):
@@ -225,7 +225,7 @@ def test_descricao_creditos_antes_de_fontes():
 
 
 def test_metadados_medio_calcula_capitulos_e_sintetico(cfg, con, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     job = fila.criar_job(con, "teste", "medio", "por que o mar é salgado", PUBLICAR)
     c = contexto_para(cfg, con, job)
     roteiro, narracao = _rot_nar([0, 40, 95], 150)
@@ -244,7 +244,7 @@ def test_metadados_medio_calcula_capitulos_e_sintetico(cfg, con, claude_falso):
 
 
 def test_metadados_guarda_descricao_base(ctx, cfg, claude_falso):
-    cfg.claude.bin = claude_falso.claude_bin
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     gravar_json(ctx, "roteiro.json", {"segmentos": [{"texto": "x", "visual": "v"}], "fontes": []})
     claude_falso.responder(_ok(_metadados()))
     metadados.executar(ctx)

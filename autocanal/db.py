@@ -70,16 +70,39 @@ CREATE TABLE IF NOT EXISTS temas (
     usado INTEGER NOT NULL DEFAULT 0,
     criado_em TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS chamadas_claude (
+CREATE TABLE IF NOT EXISTS chamadas_ia (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id TEXT,
     etapa TEXT NOT NULL,
+    provedor TEXT NOT NULL,
+    modelo TEXT,
+    tokens_entrada INTEGER,
+    tokens_saida INTEGER,
     custo_usd REAL,
     turnos INTEGER,
-    duracao_s REAL,
+    duracao_s REAL NOT NULL,
     criado_em TEXT NOT NULL
 );
 """
+
+# antes do núcleo de IA neutro, só havia o Claude (e a curadoria era registrada como `visuais`)
+_MIGRAR_CHAMADAS_CLAUDE = """
+INSERT INTO chamadas_ia (job_id, etapa, provedor, custo_usd, turnos, duracao_s, criado_em)
+SELECT job_id, CASE etapa WHEN 'visuais' THEN 'curadoria' ELSE etapa END, 'claude',
+       custo_usd, turnos, COALESCE(duracao_s, 0), criado_em
+FROM chamadas_claude ORDER BY id;
+DROP TABLE chamadas_claude;
+"""
+
+
+def _migrar(con: sqlite3.Connection) -> None:
+    existe = con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chamadas_claude'"
+    ).fetchone()
+    if existe:
+        with con:
+            for comando in filter(str.strip, _MIGRAR_CHAMADAS_CLAUDE.split(";")):
+                con.execute(comando)
 
 
 def conectar(caminho: Path) -> sqlite3.Connection:
@@ -92,4 +115,5 @@ def conectar(caminho: Path) -> sqlite3.Connection:
     con.execute("PRAGMA foreign_keys=ON")
     con.executescript(SCHEMA)
     con.commit()
+    _migrar(con)
     return con

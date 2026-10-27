@@ -7,8 +7,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from autocanal import claude, fila, grade
-from autocanal.claude import LimiteUsoClaude
+from autocanal import fila, grade, ia
 from autocanal.config import Canal, Config
 from autocanal.etapas.base import carregar_prompt, lista_md, titulos_do_canal
 from autocanal.fila import Estado, Job
@@ -19,7 +18,6 @@ log = logging.getLogger(__name__)
 MARGEM = timedelta(hours=2)
 SEMANA = timedelta(days=7)
 RECUO = timedelta(hours=4)
-FERRAMENTAS = ["Skill", "Read", "WebSearch", "WebFetch"]
 N_TITULOS = 15
 N_TEMAS_USADOS = 60
 
@@ -91,8 +89,8 @@ def planejar(
     Um pedido de temas por canal/formato com slot livre; o i-ésimo tema vai para o
     i-ésimo slot. Canal sem `nicho` é ignorado com aviso. Falha num canal/formato é
     registrada e não impede os outros; havendo falha, grava o recuo de 4 h
-    (`adiar_planejamento`), e uma rodada sem falhas o apaga. `LimiteUsoClaude` sobe
-    (quem chama grava a pausa do Claude).
+    (`adiar_planejamento`), e uma rodada sem falhas o apaga. `ia.LimiteUso` e
+    `ia.IAIndisponivel` sobem (a pausa do provedor já foi gravada por `ia.chamar`).
     """
     inicio = agora + MARGEM
     fim = agora + timedelta(days=cfg.folga_dias) + SEMANA
@@ -105,7 +103,7 @@ def planejar(
         for formato in FORMATOS:
             try:
                 criados += _planejar_um(cfg, con, canal, formato, inicio, fim, sugerir_temas)
-            except LimiteUsoClaude:
+            except (ia.LimiteUso, ia.IAIndisponivel):
                 raise
             except Exception as e:
                 falhou = True
@@ -148,8 +146,8 @@ def _juntar(item: dict) -> str:
     return f"{tema} — {angulo}" if angulo else tema
 
 
-def sugerir_temas_claude(cfg: Config, con: sqlite3.Connection) -> SugerirTemas:
-    """`sugerir_temas` que pede ao Claude (skill yt-plan + pesquisa web) N temas do nicho."""
+def sugerir_temas(cfg: Config, con: sqlite3.Connection) -> SugerirTemas:
+    """`sugerir_temas` que pede à IA (método yt-plan + pesquisa web) N temas do nicho."""
 
     def sugerir(canal: Canal, formato: str, n: int) -> list[str]:
         usados = [r["tema"] for r in con.execute(
@@ -169,17 +167,8 @@ def sugerir_temas_claude(cfg: Config, con: sqlite3.Connection) -> SugerirTemas:
         )
         pasta = cfg.dados / "estrategia"
         pasta.mkdir(parents=True, exist_ok=True)
-        r = claude.chamar(
-            prompt,
-            _schema(n),
-            FERRAMENTAS,
-            pasta,
-            modelo=cfg.claude.modelos.get("temas"),
-            max_turns=cfg.claude.max_turns.get("temas", 15),
-            claude_bin=cfg.claude.bin,
-            raiz=cfg.raiz,
-        )
-        claude.registrar(con, None, "temas", r)
+        r = ia.chamar(cfg, con, None, "temas",
+                      ia.Pedido(prompt=prompt, schema=_schema(n), pasta=pasta, web=True))
         return [_juntar(t) for t in r.dados["temas"]]
 
     return sugerir

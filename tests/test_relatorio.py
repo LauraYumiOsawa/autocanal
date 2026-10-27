@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from autocanal import fila, planejador, produtor, relatorio
+from autocanal import fila, ia, planejador, produtor, relatorio
 from autocanal.db import conectar
 from autocanal.fila import Estado
 
@@ -50,8 +50,8 @@ def _revisao(con, job_id, rodada, aprovado, motivos, criado_em="2026-10-25T18:00
 
 def _chamada(con, criado_em, custo):
     con.execute(
-        "INSERT INTO chamadas_claude (job_id, etapa, custo_usd, turnos, duracao_s, criado_em)"
-        " VALUES (NULL, 'roteiro', ?, 3, 10, ?)", (custo, criado_em),
+        "INSERT INTO chamadas_ia (job_id, etapa, provedor, custo_usd, turnos, duracao_s, criado_em)"
+        " VALUES (NULL, 'roteiro', 'claude', ?, 3, 10, ?)", (custo, criado_em),
     )
     con.commit()
 
@@ -74,7 +74,7 @@ def test_resumo_tem_secoes_e_links(cfg, con):
     con.commit()
     agora = datetime.now(UTC)
     (cfg.dados / "cota_esgotada_ate").write_text((agora + timedelta(hours=2)).isoformat())
-    produtor.pausar_claude(cfg, agora)
+    ia.pausar(cfg, "claude", "limite de uso", agora)
     planejador.adiar_planejamento(cfg, agora)
     _chamada(con, "2026-10-25T03:00:00+00:00", 0.5)
     _chamada(con, "2026-10-26T02:59:59.900000+00:00", 0.25)
@@ -160,6 +160,16 @@ def test_alerta_pausa_por_queda_geral(cfg, con):
     alertas = relatorio.alertas(cfg, con, agora)
     assert len(alertas) == 1
     assert "queda geral" in alertas[0] and "kokoro" in alertas[0]
+    assert relatorio.alertas(cfg, con, agora + timedelta(hours=2)) == []
+
+
+def test_aviso_por_provedor(cfg, con):
+    agora = datetime(2026, 10, 26, 15, tzinfo=UTC)  # 12:00 em São Paulo
+    ia.pausar(cfg, "claude", "limite de uso", agora)
+    assert relatorio.alertas(cfg, con, agora) == [
+        "IA `claude` pausada até 26/10 13:00 (limite de uso): as etapas que usam esse provedor"
+        " retomam depois."
+    ]
     assert relatorio.alertas(cfg, con, agora + timedelta(hours=2)) == []
 
 

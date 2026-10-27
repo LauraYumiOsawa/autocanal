@@ -125,7 +125,7 @@ def test_conectar_idempotente(tmp_path):
     assert con.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     nomes = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
     assert {"jobs", "etapas", "revisoes", "canais_estado", "cota", "metricas",
-            "temas", "chamadas_claude"} <= nomes
+            "temas", "chamadas_ia"} <= nomes
 
 
 def test_transicoes_falha_youtube_e_reaprovacao():

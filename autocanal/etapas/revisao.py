@@ -1,4 +1,4 @@
-"""Etapa revisão: checagens determinísticas e, se passarem, o revisor Claude."""
+"""Etapa revisão: checagens determinísticas e, se passarem, o revisor (IA)."""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from autocanal import claude, fila
+from autocanal import fila, ia
 from autocanal.etapas.metadados import AVISOS_IA
 from autocanal.etapas.base import (
     PROBLEMAS_REVISAO,
@@ -23,7 +23,6 @@ from autocanal.etapas.base import (
 from autocanal.fila import Estado
 
 NOME = "revisao"
-FERRAMENTAS = ["Read", "WebFetch", "WebSearch"]
 N_QUADROS = 6
 N_TITULOS = 15
 N_ROTEIROS = 30
@@ -209,17 +208,12 @@ def _revisor(ctx: Contexto) -> dict:
         quadros=lista_md([str(q.relative_to(ctx.pasta)) for q in quadros], "(nenhum)"),
         titulos_recentes=lista_md(titulos_recentes(ctx, N_TITULOS), "(nenhum ainda)"),
     )
-    r = claude.chamar(
-        prompt,
-        REVISAO,
-        FERRAMENTAS,
-        ctx.pasta,
-        modelo=ctx.cfg.claude.modelos.get(NOME),
-        max_turns=ctx.cfg.claude.max_turns.get(NOME, 20),
-        claude_bin=ctx.cfg.claude.bin,
-        raiz=ctx.cfg.raiz,
-    )
-    claude.registrar(ctx.con, ctx.job.id, NOME, r)
+    imagens = list(quadros)
+    if (ctx.pasta / "thumbnail.jpg").exists():
+        imagens.append(ctx.pasta / "thumbnail.jpg")
+    r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, NOME, ia.Pedido(
+        prompt=prompt, schema=REVISAO, pasta=ctx.pasta, web=True, imagens=tuple(imagens),
+    ))
     return r.dados
 
 

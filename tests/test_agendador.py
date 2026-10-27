@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from autocanal import agendador, fila, planejador, produtor
-from autocanal.claude import ErroClaude, LimiteUsoClaude
+from autocanal import agendador, fila, ia, planejador, produtor
+from autocanal.ia import ErroIA, LimiteUso
 from autocanal.db import conectar
 from autocanal.fila import Estado
 
@@ -177,17 +177,24 @@ def test_tick_fase_com_erro_nao_impede_as_outras(cfg_nicho, con, caplog):
         pass
 
 
-def test_tick_pula_producao_durante_pausa_do_claude(cfg_nicho, con):
-    fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
-    produtor.pausar_claude(cfg_nicho, AGORA.astimezone(UTC) - timedelta(minutes=30))
+def test_tick_produz_com_provedor_pausado(cfg_nicho, con):
+    # o job anda até a primeira etapa que depende do provedor pausado (ia.chamar recusa)
+    job = fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
+    ia.pausar(cfg_nicho, "claude", "limite de uso", AGORA.astimezone(UTC) - timedelta(minutes=30))
     fases = Fases()
-    r = _tick(cfg_nicho, con, fases)  # pausa vai até agora + 30 min
-    assert "produzir" not in fases.ordem and "planejar" not in fases.ordem
-    assert r.produzido is None
-    assert fases.ordem == ["publicar", "sincronizar", "resumo"]
+    r = _tick(cfg_nicho, con, fases)
+    assert "produzir" in fases.ordem
+    assert r.produzido == job.id
+
+
+def test_tick_nao_planeja_com_provedor_de_temas_pausado(cfg_nicho, con):
+    ia.pausar(cfg_nicho, "claude", "limite de uso", AGORA.astimezone(UTC) - timedelta(minutes=30))
+    fases = Fases()
+    _tick(cfg_nicho, con, fases)  # pausa vai até agora + 30 min
+    assert "planejar" not in fases.ordem
     fases = Fases()
     _tick(cfg_nicho, con, fases, AGORA + timedelta(minutes=31))
-    assert "produzir" in fases.ordem
+    assert "planejar" in fases.ordem
 
 
 def test_tick_pula_producao_durante_pausa_do_sistema(cfg_nicho, con):
@@ -202,20 +209,20 @@ def test_tick_pula_producao_durante_pausa_do_sistema(cfg_nicho, con):
     assert "produzir" in fases.ordem
 
 
-def test_tick_limite_do_claude_no_planejamento_pausa(cfg_nicho, con):
-    fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
+def test_tick_limite_no_planejamento_nao_para_a_producao(cfg_nicho, con):
+    job = fila.criar_job(con, "teste", "short", "t", datetime(2026, 10, 26, 15, tzinfo=UTC))
     fases = Fases()
 
     def planejar(cfg, con, agora):
         fases.ordem.append("planejar")
-        raise LimiteUsoClaude("usage limit reached")
+        raise LimiteUso("claude", "usage limit reached")
 
     agora = AGORA.astimezone(UTC)
     r = agendador.tick(cfg_nicho, con, agora, relogio=lambda: agora,
                        **{**fases.kwargs(), "planejar_fn": planejar})
-    assert fases.ordem == ["publicar", "sincronizar", "resumo", "planejar"]
-    assert r.produzido is None
-    assert produtor.pausa_claude_ate(cfg_nicho) == AGORA.astimezone(UTC) + timedelta(hours=1)
+    assert fases.ordem == ["publicar", "sincronizar", "resumo", "planejar", "produzir"]
+    assert r.produzido == job.id
+    assert produtor.pausa_sistema(cfg_nicho) is None
 
 
 def test_tick_publica_com_relogio_atualizado(cfg_nicho, con):
@@ -249,7 +256,7 @@ def test_tick_adia_planejamento_apos_falha(cfg_nicho, con):
 
     def sugerir(canal, formato, n):
         pedidos.append(n)
-        raise ErroClaude("falhou após 3 tentativas")
+        raise ErroIA("claude", "falhou após 3 tentativas")
 
     def planejar(cfg, con, agora):
         return planejador.planejar(cfg, con, agora, sugerir_temas=sugerir)

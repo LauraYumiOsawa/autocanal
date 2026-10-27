@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from autocanal import fila, planejador, produtor, publicador
+from autocanal import fila, ia, planejador, produtor, publicador
 from autocanal.config import Config
 from autocanal.fila import Estado, Job
 
@@ -79,7 +79,7 @@ _COM_VISUAIS = (Estado.PRODUZINDO, Estado.EM_REVISAO, Estado.QUARENTENA, Estado.
 
 
 def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
-    """Canais sem autorização, cota do YouTube esgotada, pausa do Claude e recuo do planejador."""
+    """Canais sem autorização, cota do YouTube esgotada, pausas de IA e recuo do planejador."""
     avisos: list[str] = []
     conhecidos: set[str] = set()
     for r in con.execute("SELECT canal, auth_ok, ultimo_erro FROM canais_estado ORDER BY canal"):
@@ -95,10 +95,9 @@ def alertas(cfg: Config, con: sqlite3.Connection, agora: datetime) -> list[str]:
     cota = publicador.cota_esgotada_ate(cfg)
     if cota is not None and agora < cota:
         avisos.append(f"Cota do YouTube esgotada: envios suspensos até {_hora(cfg, cota)}.")
-    pausa = produtor.pausa_claude_ate(cfg)
-    if pausa is not None and agora < pausa:
-        avisos.append(f"Claude pausado por limite de uso do plano até {_hora(cfg, pausa)}:"
-                      " a produção retoma depois.")
+    for provedor, (ate, motivo) in ia.pausas(cfg, agora).items():
+        avisos.append(f"IA `{provedor}` pausada até {_hora(cfg, ate)} ({motivo}): as etapas que"
+                      " usam esse provedor retomam depois.")
     atrasados = [j for j in fila.listar(con, {Estado.AGENDADO})
                  if j.youtube_video_id and agora > j.publish_at + ATRASO_PUBLICACAO]
     if atrasados:
@@ -162,7 +161,7 @@ def _supervisao(cfg: Config, con: sqlite3.Connection, dia: date) -> list[str]:
 
 def _consumo(con: sqlite3.Connection, inicio: datetime, fim: datetime) -> list[str]:
     sql, args = _no_periodo(
-        "SELECT COUNT(*) AS n, COALESCE(SUM(custo_usd), 0) AS custo FROM chamadas_claude WHERE",
+        "SELECT COUNT(*) AS n, COALESCE(SUM(custo_usd), 0) AS custo FROM chamadas_ia WHERE",
         inicio, fim,
     )
     r = con.execute(sql, args).fetchone()
