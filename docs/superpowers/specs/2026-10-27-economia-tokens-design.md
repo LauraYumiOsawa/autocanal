@@ -47,8 +47,9 @@ pesquisa nova, e a revisão roda de novo.
 
 ## 2. Bancada de medição
 
-`autocanal bancada rodar <job> <etapa> --rotulo <texto> [--modelo M] [--esforco E]` e
-`autocanal bancada relatorio`.
+`autocanal bancada rodar <job> <etapa> --rotulo <texto> [--modelo M] [--esforco E] [--primeira-versao]`
+e `autocanal bancada relatorio`. `--primeira-versao` tira `problemas_revisao.json` da cópia, para medir
+o roteiro como primeira versão e não como refação (seção 11).
 
 - Etapas aceitas: `roteiro`, `metadados`, `revisao` (só IA; curadoria chama Pixabay e FLUX e fica fora).
 - **Isolamento:** a pasta do job é copiada para `dados/bancada/<carimbo>-<job>-<etapa>-<rotulo>/jobs/<job>/`;
@@ -196,35 +197,63 @@ Candidatas e regra de aceite, todas medidas pela bancada:
 
 A revisão do médio usou 75 turnos com `--max-turns 30`, o que confirma o achado 3.
 
-### Depois (2026-10-27; roteiro e metadados no commit `a1b0e0b`, rótulo `depois`; revisão no `c635a91`, rótulo `depois2`)
+### Depois (2026-10-27)
+
+Commits e rótulos por etapa:
+- roteiro: `0bc30e3`, rótulo `depois-1a`, com `--primeira-versao`;
+- metadados: `a1b0e0b`, rótulo `depois`;
+- revisão: `c635a91`, rótulo `depois2`.
 
 | Job | Etapa | Tokens de entrada | Tokens de saída | US$ equiv. | Turnos | Métricas |
 |---|---|---|---|---|---|---|
-| short-5643 | roteiro | 227.140 | 13.201 | 0,55 | 16 | palavras ok, gancho 42, 15 fontes (15 confirmadas) |
+| short-5643 | roteiro | 599.698 | 26.034 | 1,19 | 34 | palavras ok, gancho 39, 14 fontes (14 confirmadas) |
 | short-5643 | metadados | 60.882 | 4.996 | 0,13 | 6 | título 98, 1 problema |
 | short-5643 | revisão | 126.282 | 14.128 | 0,62 | 27 | reprovado (visuais), 5 problemas |
-| medio-e862 | roteiro | 712.031 | 36.123 | 1,46 | 36 | palavras ok, gancho 47, 39 fontes (38 confirmadas) |
+| medio-e862 | roteiro | 1.004.992 | 55.374 | 2,03 | 47 | palavras ok, gancho 40, 26 fontes (25 confirmadas) |
 | medio-e862 | metadados | 120.545 | 7.181 | 0,17 | 8 | título 100, 1 problema |
 | medio-e862 | revisão | 282.356 | 20.509 | 1,16 | 73 | reprovado (visuais), 8 problemas |
-| **soma** | | **1.529.236** | **96.138** | **4,09** | | |
+| **soma** | | **2.194.755** | **128.222** | **5,30** | | |
 
-**Redução nos tokens de entrada:** 69,9% no total (5.080.503 → 1.529.236). Por etapa:
-- roteiro: −55,3% (2.101.046 → 939.171);
-- metadados: −64,3% (507.773 → 181.427);
-- revisão: −83,5% (2.471.684 → 408.638).
+**Redução nos tokens de entrada:** 56,8% no total (5.080.503 → 2.194.755). Por etapa:
 
-Os tokens de saída caíram 12% e o valor equivalente, 38% (US$ 6,59 → 4,09). O valor cai menos que os
-tokens de entrada provavelmente porque a maior parte dos tokens cortados era leitura de cache, que custa pouco.
+| Etapa | Tokens de entrada | US$ equiv. | Turnos |
+|---|---|---|---|
+| roteiro | −23,6% (2.101.046 → 1.604.690) | +0,5% (3,20 → 3,22) | 64 → 81 |
+| metadados | −64,3% (507.773 → 181.427) | −23,6% (0,39 → 0,30) | 22 → 14 |
+| revisão | −83,5% (2.471.684 → 408.638) | −40,4% (2,99 → 1,78) | 102 → 100 |
+
+O valor equivalente caiu 19,5% (US$ 6,59 → 5,30), e os tokens de saída subiram 17%. O roteiro quase não
+economizou em valor: os tokens de entrada caíram, mas ele usou mais turnos e escreveu mais. Os tokens
+cortados nas outras etapas eram, em boa parte, leitura de cache, que custa pouco. Por isso o valor cai
+menos que os tokens.
+
+**Por que o roteiro foi medido duas vezes.** Os dois jobs medidos têm um `problemas_revisao.json` de
+uma revisão anterior, e a cópia da bancada levava esse arquivo junto.
+- Na primeira medição (`a1b0e0b`, rótulo `depois`), o roteiro seguiu o caminho de refazer a partir da
+  versão anterior (seção 8). Ele devolveu quase o mesmo texto (similaridade 1,00), com o gancho e a nota
+  do job real.
+- A linha `antes` (código antigo) tinha reescrito do zero.
+- Essa primeira medição (227.140 e 712.031 tokens; −55,3%) mostra o que a seção 8 economiza quando a
+  revisão reprova e o roteiro é refeito. Não mede a primeira versão.
+- A bancada ganhou `--primeira-versao`, que tira `problemas_revisao.json` da cópia, e o roteiro foi
+  remedido assim.
+- Ressalva: o `antes` ainda tinha os problemas no prompt, mas escreveu do zero. A diferença no tamanho
+  do prompt é de poucos KB, contra cerca de 1 milhão de tokens.
 
 **Critérios:**
-1. Suíte: 481 testes passando (3 `real` fora).
-2. Tokens de entrada caem pelo menos 40% somando roteiro, metadados e revisão: **atendido (−69,9%)**.
-3. Qualidade, **atendido depois da correção abaixo**:
+1. Suíte: 488 testes passando (3 `real` fora).
+2. Tokens de entrada caem pelo menos 40% somando roteiro, metadados e revisão: **atendido (−56,8%)**.
+3. Qualidade: **atendido, com margem estreita no gancho e só depois da correção da revisão abaixo**:
    - palavras do roteiro dentro da faixa nos dois jobs;
-   - `nota_gancho` média de 44 → 44,5;
+   - `nota_gancho` média de 44 → 39,5 (−4,5, dentro da tolerância de 5);
    - `nota_titulo` média de 97 → 99;
    - a revisão reprova os dois vídeos pelos visuais, antes e depois.
 4. Registrado aqui.
+
+A queda do gancho está dentro da tolerância, mas veio com uma execução por job. A causa provável é a
+pontuação numa chamada só (seção 5): o modelo pontua os 5 candidatos de uma vez em vez de reescrever e
+pontuar um a um. Acompanhar a `nota_gancho` dos próximos vídeos reais; se a média ficar abaixo de 40,
+rever a seção 5 antes da fase B.
 
 **Divergência investigada: a revisão ficou cega aos visuais.** Na primeira medição depois (commit
 `a1b0e0b`), a revisão **aprovou** os dois vídeos (short nota 84, médio 86, nenhum problema), que antes
@@ -250,6 +279,8 @@ As linhas `depois` da revisão no `resultados.jsonl` ficam como registro da falh
 comparação.
 
 **Para a fase B:**
+- O roteiro é a etapa que menos economizou (−23,6% em tokens e nada em valor) e é a mais cara. Ele é o
+  alvo principal da fase B.
 - A revisão do médio ainda gasta 73 turnos. O prompt pede para abrir as imagens numa rodada só, mas o
   modelo abre quase uma por turno. Agrupar as leituras é a próxima alavanca da revisão.
 - Os metadados geram mais tokens de saída (2.693 → 6.088 em média), embora o valor tenha caído.
