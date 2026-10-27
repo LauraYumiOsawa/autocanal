@@ -48,6 +48,7 @@ class ErroIA(Exception):
     def __init__(self, provedor: str, msg: str):
         super().__init__(f"{provedor}: {msg}")
         self.provedor = provedor
+        self.msg = msg
 
 
 class LimiteUso(ErroIA):
