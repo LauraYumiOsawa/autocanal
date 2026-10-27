@@ -120,6 +120,12 @@ chamada com todos os candidatos; a IA continua escolhendo (o maior `verdict` / `
 maior tenha `lado_max` pixels. A revisão usa `lado_max=960` (Short 540×960; médio 960×540). A thumbnail
 continua no tamanho original.
 
+**Visual de cada segmento (acrescentado na medição, seção 11):** além dos 6 quadros do vídeo final, o
+revisor recebe o visual de cada segmento em `revisao/visuais/seg_NN.jpg` (imagem reduzida a 960 px no
+lado maior; vídeo vira o quadro do meio), listado no prompt com o texto falado daquele segmento. Antes, o
+revisor achava a pasta `visuais/` sozinho com as ferramentas de listagem, que a chamada enxuta (seção 3)
+tirou.
+
 ## 7. Fontes conferidas pelo Python
 
 - O schema das fontes do roteiro ganha `trecho` (obrigatório): uma frase copiada literalmente da página
@@ -187,3 +193,63 @@ Candidatas e regra de aceite, todas medidas pela bancada:
 | **soma** | | **5.080.503** | **109.203** | **6,59** | | |
 
 A revisão do médio usou 75 turnos com `--max-turns 30`, o que confirma o achado 3.
+
+### Depois (2026-10-27; roteiro e metadados no commit `a1b0e0b`, rótulo `depois`; revisão no `c635a91`, rótulo `depois2`)
+
+| Job | Etapa | Tokens de entrada | Tokens de saída | US$ equiv. | Turnos | Métricas |
+|---|---|---|---|---|---|---|
+| short-5643 | roteiro | 227.140 | 13.201 | 0,55 | 16 | palavras ok, gancho 42, 15 fontes (15 confirmadas) |
+| short-5643 | metadados | 60.882 | 4.996 | 0,13 | 6 | título 98, 1 problema |
+| short-5643 | revisão | 126.282 | 14.128 | 0,62 | 27 | reprovado (visuais), 5 problemas |
+| medio-e862 | roteiro | 712.031 | 36.123 | 1,46 | 36 | palavras ok, gancho 47, 39 fontes (38 confirmadas) |
+| medio-e862 | metadados | 120.545 | 7.181 | 0,17 | 8 | título 100, 1 problema |
+| medio-e862 | revisão | 282.356 | 20.509 | 1,16 | 73 | reprovado (visuais), 8 problemas |
+| **soma** | | **1.529.236** | **96.138** | **4,09** | | |
+
+**Redução nos tokens de entrada:** 69,9% no total (5.080.503 → 1.529.236). Por etapa:
+- roteiro: −55,3% (2.101.046 → 939.171);
+- metadados: −64,3% (507.773 → 181.427);
+- revisão: −83,5% (2.471.684 → 408.638).
+
+Os tokens de saída caíram 12% e o valor equivalente, 38% (US$ 6,59 → 4,09). O valor cai menos que os
+tokens de entrada provavelmente porque a maior parte dos tokens cortados era leitura de cache, que custa pouco.
+
+**Critérios:**
+1. Suíte: 481 testes passando (3 `real` fora).
+2. Tokens de entrada caem pelo menos 40% somando roteiro, metadados e revisão: **atendido (−69,9%)**.
+3. Qualidade, **atendido depois da correção abaixo**:
+   - palavras do roteiro dentro da faixa nos dois jobs;
+   - `nota_gancho` média de 44 → 44,5;
+   - `nota_titulo` média de 97 → 99;
+   - a revisão reprova os dois vídeos pelos visuais, antes e depois.
+4. Registrado aqui.
+
+**Divergência investigada: a revisão ficou cega aos visuais.** Na primeira medição depois (commit
+`a1b0e0b`), a revisão **aprovou** os dois vídeos (short nota 84, médio 86, nenhum problema), que antes
+reprovava com 6 problemas visuais concretos cada. A revisão do job real em 2026-10-24 apontava os mesmos
+problemas.
+
+Causa: pelos horários de acesso dos arquivos nas cópias da bancada, o revisor da linha de base achava
+sozinho a pasta `visuais/` e abria a imagem de cada segmento (6 de 12 no short, 40 de 50 no médio). Foi
+nelas que achou a maioria dos problemas. A chamada enxuta (`--tools Read WebSearch WebFetch`, seção 3)
+tirou as ferramentas de listagem, e o prompt nunca citou `visuais/`. Com isso, o revisor passou a ver só
+os 6 quadros do vídeo final e abriu 0 visuais.
+
+Uma sonda descartou a redução para 960 px (seção 6): o defeito do plugue no quadro 2 do short aparece nas
+duas resoluções.
+
+Correção (commit `c635a91`, seção 6): o revisor recebe explicitamente o visual de cada segmento com o
+texto falado. Na nova medição ele abriu 12 de 12 visuais no short e 50 de 50 no médio, e reprovou os dois.
+Os problemas coincidem com os da linha de base:
+- short: segmentos 3, 4, 7, 8 e 10 (o 11 não voltou);
+- médio: trechos 2, 13, 17, 42 e 44, mais 11, 15 e 25 (o 32 não voltou).
+
+As linhas `depois` da revisão no `resultados.jsonl` ficam como registro da falha e não entram na
+comparação.
+
+**Para a fase B:**
+- A revisão do médio ainda gasta 73 turnos. O prompt pede para abrir as imagens numa rodada só, mas o
+  modelo abre quase uma por turno. Agrupar as leituras é a próxima alavanca da revisão.
+- Os metadados geram mais tokens de saída (2.693 → 6.088 em média), embora o valor tenha caído.
+- Toda alavanca da fase B que mexer em ferramentas ou entradas do revisor precisa ser medida pelo
+  veredito e pelos problemas apontados, não só pelos tokens.
