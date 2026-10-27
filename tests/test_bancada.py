@@ -81,6 +81,7 @@ def test_bancada_modelo_e_esforco_so_na_etapa(cfg, con, job, falso):
                           agora=AGORA)
     [argv] = falso.chamadas()
     assert argv[argv.index("--model") + 1] == "haiku"
+    assert argv[argv.index("--effort") + 1] == "low"
     assert (linha["modelo"], linha["esforco"]) == ("haiku", "low")
     assert cfg.ia.provedores["claude"].modelos.get("metadados") == "sonnet"
     assert cfg.ia.provedores["claude"].esforco.get("metadados") is None

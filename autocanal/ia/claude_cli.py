@@ -20,6 +20,17 @@ from autocanal.ia.cofre import caminhos_proibidos
 
 NOME = "claude"
 CAPACIDADES = Capacidades(web=True, imagens=True, scripts=True)
+# sem skills, MCPs, plugins e hooks do usuário: 29,5 mil → 4,5 mil tokens de contexto fixo
+FLAGS_ENXUTAS = ["--disable-slash-commands", "--strict-mcp-config", "--setting-sources", "project",
+                 "--exclude-dynamic-system-prompt-sections"]
+
+
+def _ferramentas(pedido: Pedido) -> list[str]:
+    return [
+        "Read",
+        *(["WebSearch", "WebFetch"] if pedido.web else []),
+        *(["Bash"] if pedido.scripts else []),
+    ]
 
 
 def _permitidas(pedido: Pedido) -> list[str]:
@@ -37,7 +48,13 @@ def _negadas(raiz: Path) -> list[str]:
 
 
 def montar_argv(
-    pedido: Pedido, *, modelo: str | None, max_turns: int, bin: str, raiz: Path
+    pedido: Pedido,
+    *,
+    modelo: str | None,
+    esforco: str | None = None,
+    max_turns: int,
+    bin: str,
+    raiz: Path,
 ) -> list[str]:
     return (
         [
@@ -48,6 +65,9 @@ def montar_argv(
             "--max-turns", str(max_turns),
         ]
         + (["--model", modelo] if modelo else [])
+        + (["--effort", esforco] if esforco else [])
+        + FLAGS_ENXUTAS
+        + ["--tools", *_ferramentas(pedido)]
         + ["--disallowedTools", *_negadas(raiz)]
         + ["--allowedTools", *_permitidas(pedido)]
     )
@@ -98,13 +118,15 @@ def chamar(
     pedido: Pedido,
     *,
     modelo: str | None,
+    esforco: str | None = None,
     max_turns: int,
     bin: str,
     raiz: Path,
     tentativas: int = 3,
     executar=subprocess.run,
 ) -> Resultado:
-    argv = montar_argv(pedido, modelo=modelo, max_turns=max_turns, bin=bin, raiz=raiz)
+    argv = montar_argv(pedido, modelo=modelo, esforco=esforco, max_turns=max_turns, bin=bin,
+                       raiz=raiz)
     motivo = "nenhuma tentativa feita"
     for _ in range(tentativas):
         try:

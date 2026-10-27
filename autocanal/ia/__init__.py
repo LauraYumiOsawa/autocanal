@@ -133,6 +133,7 @@ def chamar(
         r = adaptador.chamar(
             pedido,
             modelo=conf.modelos.get(etapa),
+            esforco=conf.esforco.get(etapa),
             max_turns=cfg.ia.max_turns.get(etapa, MAX_TURNS_PADRAO),
             bin=conf.bin,
             raiz=cfg.raiz,

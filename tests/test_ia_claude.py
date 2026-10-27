@@ -26,8 +26,8 @@ def pedido(pasta: Path, **kw) -> Pedido:
     return Pedido(prompt="oi", schema=SCHEMA, pasta=pasta, **kw)
 
 
-def _argv(p: Pedido, raiz: Path, modelo=None) -> list[str]:
-    return montar_argv(p, modelo=modelo, max_turns=5, bin="c", raiz=raiz)
+def _argv(p: Pedido, raiz: Path, modelo=None, esforco=None) -> list[str]:
+    return montar_argv(p, modelo=modelo, esforco=esforco, max_turns=5, bin="c", raiz=raiz)
 
 
 def _chamar(falso, tmp_path, p=None, **kw):
@@ -205,3 +205,23 @@ def test_timeout_conta_como_tentativa_falha(tmp_path):
     with pytest.raises(ErroIA, match="timeout"):
         chamar(pedido(tmp_path), modelo=None, max_turns=5, bin="c", raiz=tmp_path,
                tentativas=2, executar=executar)
+
+
+def test_argv_enxuto(tmp_path):
+    a = _argv(pedido(tmp_path, web=True), tmp_path)
+    for f in ("--disable-slash-commands", "--strict-mcp-config",
+              "--exclude-dynamic-system-prompt-sections"):
+        assert f in a
+    assert a[a.index("--setting-sources") + 1] == "project"
+    assert a[a.index("--tools") + 1:a.index("--disallowedTools")] == ["Read", "WebSearch", "WebFetch"]
+
+
+def test_argv_tools_com_scripts(tmp_path):
+    a = _argv(pedido(tmp_path, scripts=("metodo/pontuar.py",)), tmp_path)
+    assert a[a.index("--tools") + 1:a.index("--disallowedTools")] == ["Read", "Bash"]
+
+
+def test_argv_esforco_so_quando_definido(tmp_path):
+    a = _argv(pedido(tmp_path), tmp_path, esforco="xhigh")
+    assert a[a.index("--effort") + 1] == "xhigh"
+    assert "--effort" not in _argv(pedido(tmp_path), tmp_path)

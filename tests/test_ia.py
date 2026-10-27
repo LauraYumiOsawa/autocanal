@@ -207,3 +207,19 @@ def test_migracao_idempotente(tmp_path):
     conectar(tmp_path / "db.sqlite").close()
     con = conectar(tmp_path / "db.sqlite")
     assert con.execute("SELECT COUNT(*) FROM chamadas_ia").fetchone()[0] == 2
+
+
+def test_chamar_usa_esforco_da_etapa(cfg_falso, con, claude_falso, tmp_path):
+    cfg_falso.ia.provedores["claude"].esforco["metadados"] = "high"
+    claude_falso.responder(_ok({"x": 1}), _ok({"x": 1}))
+    ia.chamar(cfg_falso, con, None, "metadados", _pedido(tmp_path))
+    ia.chamar(cfg_falso, con, None, "roteiro", _pedido(tmp_path))
+    meta, rot = claude_falso.chamadas()
+    assert meta[meta.index("--effort") + 1] == "high"
+    assert "--effort" not in rot
+
+
+def test_config_esforco_etapa_desconhecida(raiz_teste):
+    _mudar_ia(raiz_teste, provedores={"claude": {"bin": "claude", "esforco": {"render": "low"}}})
+    with pytest.raises(ValueError, match="render"):
+        carregar(raiz_teste)

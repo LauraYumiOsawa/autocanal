@@ -10,6 +10,10 @@ ia:
   etapas: {}                     # só as exceções, ex.: {curadoria: codex}
   max_turns: {roteiro: 30, metadados: 20, revisao: 30, temas: 15, curadoria: 25}
   provedores:
-    claude: {bin: claude, modelos: {metadados: sonnet, temas: sonnet}}
+    claude:
+      bin: claude
+      modelos: {metadados: sonnet, temas: sonnet}
+      # explícito: a chamada enxuta não lê o ~/.claude/settings.json (que define xhigh)
+      esforco: {roteiro: xhigh, curadoria: xhigh, metadados: xhigh, revisao: xhigh, temas: xhigh}
 flux:
   projeto: servicos/flux
