@@ -236,17 +236,18 @@ def _dados_do_video(ctx: Contexto) -> dict[str, str]:
     }
 
 
-def _visuais_por_segmento(ctx: Contexto) -> list[Path]:
-    """Um JPEG reduzido por segmento (`revisao/visuais/seg_NN.jpg`), na ordem do roteiro.
+def _visuais_por_segmento(ctx: Contexto) -> list[tuple[int, Path | None]]:
+    """`(nº do segmento, JPEG reduzido)` na ordem do roteiro (`revisao/visuais/seg_NN.jpg`).
 
     O arquivo vem sempre de `ctx.pasta / "visuais"` (na bancada o `caminho` registrado
-    aponta para o job real). Mídia ausente é pulada: as checagens já a acusam.
+    aponta para o job real). Sem o arquivo, o par traz `None` e o prompt avisa o revisor.
     """
     destino = ctx.pasta / "revisao" / "visuais"
-    saidas: list[Path] = []
+    saidas: list[tuple[int, Path | None]] = []
     for i, m in enumerate(ler_json_opcional(ctx, "fontes_midia.json", []), 1):
         arquivo = ctx.pasta / "visuais" / Path(m["caminho"]).name
         if not arquivo.exists():
+            saidas.append((i, None))
             continue
         destino.mkdir(parents=True, exist_ok=True)
         saida = destino / f"seg_{i:02d}.jpg"
@@ -260,7 +261,7 @@ def _visuais_por_segmento(ctx: Contexto) -> list[Path]:
                 im = im.convert("RGB")
                 im.thumbnail((LADO_QUADRO, LADO_QUADRO))
                 im.save(saida, "JPEG")
-        saidas.append(saida)
+        saidas.append((i, saida))
     return saidas
 
 
@@ -279,12 +280,13 @@ def _revisor(ctx: Contexto) -> dict:
         formato=fmt.resumo,
         quadros=lista_md([str(q.relative_to(ctx.pasta)) for q in quadros], "(nenhum)"),
         visuais=lista_md([
-            f'{v.relative_to(ctx.pasta)} — "{segmentos[int(v.stem[4:]) - 1]["texto"]}"'
-            for v in visuais
+            f'{v.relative_to(ctx.pasta)} — "{segmentos[i - 1]["texto"]}"' if v else
+            f'seg_{i:02d}: visual ausente (arquivo não encontrado) — "{segmentos[i - 1]["texto"]}"'
+            for i, v in visuais
         ], "(nenhum)"),
         titulos_recentes=lista_md(titulos_recentes(ctx, N_TITULOS), "(nenhum ainda)"),
     )
-    imagens = [*quadros, *visuais]
+    imagens = [*quadros, *(v for _, v in visuais if v)]
     if (ctx.pasta / "thumbnail.jpg").exists():
         imagens.append(ctx.pasta / "thumbnail.jpg")
     r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, NOME, ia.Pedido(

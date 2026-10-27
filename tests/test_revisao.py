@@ -542,7 +542,7 @@ def test_visuais_retrato_usa_arquivo_do_job(ctx, tmp_path):
     gravar_json(ctx, "fontes_midia.json", [
         {"caminho": str(tmp_path / "outro_job" / "visuais" / "seg_01.png"), "tipo": "imagem"},
     ])
-    [saida] = revisao._visuais_por_segmento(ctx)
+    [(_, saida)] = revisao._visuais_por_segmento(ctx)
     assert saida == ctx.pasta / "revisao" / "visuais" / "seg_01.jpg"
     assert Image.open(saida).size == (540, 960)
 
@@ -554,7 +554,7 @@ def test_visuais_paisagem(ctx):
     gravar_json(ctx, "fontes_midia.json", [
         {"caminho": "visuais/seg_01.png", "tipo": "imagem"},
     ])
-    [saida] = revisao._visuais_por_segmento(ctx)
+    [(_, saida)] = revisao._visuais_por_segmento(ctx)
     assert Image.open(saida).size == (960, 540)
 
 
@@ -573,13 +573,27 @@ def test_visuais_video_usa_extrair_frames(ctx, videos, monkeypatch):
         return original(self, video, n, destino, lado_max=lado_max)
 
     monkeypatch.setattr(type(ctx.midia), "extrair_frames", espia)
-    [saida] = revisao._visuais_por_segmento(ctx)  # o item 1 não existe: é pulado
+    [(i1, ausente), (i2, saida)] = revisao._visuais_por_segmento(ctx)  # o item 1 não existe
+    assert (i1, ausente, i2) == (1, None, 2)
     assert saida.name == "seg_02.jpg" and saida.exists()
     assert chamadas == [("seg_02.mp4", 1, 960)]
 
 
-def test_visuais_ausente_e_pulado(ctx):
-    assert revisao._visuais_por_segmento(ctx) == []
+def test_visuais_ausente_vem_como_none(ctx):
+    assert revisao._visuais_por_segmento(ctx) == [(i, None) for i in range(1, 5)]
+
+
+def test_revisor_e_avisado_de_visual_ausente(ctx, cfg, con, claude_falso):
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    for i in (1, 3, 4):
+        _png(ctx.pasta / "visuais" / f"seg_{i:02d}.jpg", (800, 600))
+    claude_falso.responder(_parecer(True))
+    revisao.executar(ctx)
+    prompt = claude_falso.chamadas()[0][2]
+    assert f'seg_02: visual ausente (arquivo não encontrado) — "{TEXTOS[1]}"' in prompt
+    assert f'revisao/visuais/seg_01.jpg — "{TEXTOS[0]}"' in prompt
+    assert f'revisao/visuais/seg_03.jpg — "{TEXTOS[2]}"' in prompt
+    assert "revisao/visuais/seg_02.jpg" not in prompt
 
 
 def test_revisor_recebe_visuais_depois_dos_quadros(ctx, cfg, con, claude_falso):
