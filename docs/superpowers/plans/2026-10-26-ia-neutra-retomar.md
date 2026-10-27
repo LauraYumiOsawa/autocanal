@@ -50,3 +50,8 @@ Pausado em 2026-10-26 a pedido de Laura, que vai fazer o login do Codex depois.
 - Se a leitura proibida não funcionar na versão oficial, o adaptador não é entregue (spec §2), e o desenho volta para a Laura.
 - Os testes usam `/home/losawa/.local/share/autocanal-tools/bin/uv run pytest -q` (o `uv` não está no PATH).
 - O que veio depois desta pausa (por exemplo, a economia de tokens) pode ter mexido nos mesmos arquivos: antes da Task 8, rodar a suíte e conferir o `git log`.
+- **A economia de tokens (branch `feat/economia-tokens`, que sai da `feat/ia-neutra`) mudou o contrato dos adaptadores:**
+  - `montar_argv` e `chamar` recebem também `esforco: str | None` (vindo de `ia.provedores.<p>.esforco`). O adaptador do Codex deve traduzi-lo para `-c model_reasoning_effort=<nível>`; confirmar os nomes dos níveis na sondagem.
+  - O `metodo.preparar` copia também `metodo/pontuar.py`, e `ia.SCRIPTS` aponta para ele.
+  - O roteiro exige `trecho` nas fontes, e o schema estrito do Codex precisa aceitar o `maxLength` de 300; conferir na sondagem.
+  - A `feat/economia-tokens` foi mesclada na `feat/ia-neutra` em 2026-10-27 (fast-forward até `917c9fe`); retomar o Codex da `feat/ia-neutra`. O revisor agora recebe também o visual de cada segmento (`revisao/visuais/seg_NN.jpg`) como imagens do pedido: o adaptador do Codex precisa entregar até ~60 imagens numa chamada.
