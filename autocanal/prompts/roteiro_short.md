@@ -8,8 +8,8 @@ Tema: {tema}
 2. O perfil de voz do canal, mais abaixo, **substitui** `~/.claude/youtube/voice.md`: não leia nem crie esse arquivo e não peça vídeos de referência.
 3. Não faça perguntas: ninguém vai responder. Decida sozinho. Ignore os passos do método que dependem de conversa (mostrar opções, perguntar se pode publicar); a sua resposta final é só o JSON pedido.
 4. Não leia nem escreva arquivos fora da pasta atual.
-5. Escreva 5 ganchos diferentes, usando fórmulas diferentes. Pontue cada um com
-   `python3 metodo/yt-script/hookscore.py --json --hook "<gancho>"`
+5. Escreva 5 ganchos diferentes, usando fórmulas diferentes. Pontue os 5 numa única chamada com
+   `python3 metodo/pontuar.py ganchos "<gancho 1>" "<gancho 2>" "<gancho 3>" "<gancho 4>" "<gancho 5>"`
    e use o de maior `verdict`. Essa nota (0 a 100) vai em `nota_gancho`.
 6. Toda afirmação factual do texto falado precisa de fonte: pesquise na web, confirme abrindo a página e registre em `fontes` a afirmação e a URL da página que a confirma.
 7. Nunca invente números, datas, nomes, resultados ou fontes. Se não encontrar confirmação, reescreva a frase sem o dado.
@@ -31,7 +31,7 @@ Tema: {tema}
 ## Formato da resposta
 
 - `gancho`: o gancho escolhido, exatamente como será falado.
-- `nota_gancho`: o `verdict` do hookscore para esse gancho.
+- `nota_gancho`: o `verdict` do `pontuar.py` para esse gancho.
 - `segmentos`: de 6 a 16 trechos, na ordem em que serão falados. O primeiro começa com o gancho. **Cada trecho é uma única frase** (o visual troca a cada frase, então frases curtas, de 3 a 5 segundos falados).
   - `texto`: exatamente o que a voz vai falar, em pt-BR, escrito como se fala. Sem marcações, sem indicações de cena, sem emojis, sem hashtags.
   - `visual`: consulta curta **em inglês** (2 a 5 palavras) para buscar vídeo ou foto num banco de imagens (Pixabay). Algo concreto e filmável, sem nomes de marcas nem de pessoas.

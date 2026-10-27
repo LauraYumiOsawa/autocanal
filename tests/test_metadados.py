@@ -133,7 +133,7 @@ def test_metadados_grava_json(ctx, cfg, claude_falso):
     }
     argv = claude_falso.chamadas()[0]
     assert argv[argv.index("--allowedTools") + 1:] == [
-        "Read", "Bash(python3 metodo/yt-package/title.py:*)"
+        "Read", "Bash(python3 metodo/pontuar.py:*)"
     ]
     for nome in ("yt-package", "yt-seo", "yt-chapters"):
         assert (ctx.pasta / "metodo" / nome / "SKILL.md").exists()
@@ -142,7 +142,7 @@ def test_metadados_grava_json(ctx, cfg, claude_falso):
     assert argv[argv.index("--max-turns") + 1] == "20"
     prompt = argv[2]
     assert "por que o mar é salgado" in prompt and "título fraco" in prompt
-    assert "python3 metodo/yt-package/title.py --json" in prompt
+    assert "python3 metodo/pontuar.py titulos" in prompt
     n = ctx.con.execute(
         "SELECT COUNT(*) FROM chamadas_ia WHERE job_id = ? AND etapa = 'metadados'",
         (ctx.job.id,),

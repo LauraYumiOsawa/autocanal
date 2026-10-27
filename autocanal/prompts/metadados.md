@@ -10,8 +10,8 @@ Formato: {formato}
 3. O perfil de voz do canal, mais abaixo, **substitui** `~/.claude/youtube/voice.md`: não leia nem crie esse arquivo e não peça vídeos de referência.
 4. Não faça perguntas: ninguém vai responder. Decida sozinho. Ignore os passos dos métodos que dependem de conversa (mostrar opções, perguntar se pode publicar); a sua resposta final é só o JSON pedido.
 5. Não leia nem escreva arquivos fora da pasta atual.
-6. Escreva 10 títulos diferentes, cada um com o seu texto de thumbnail, e pontue cada par com
-   `python3 metodo/yt-package/title.py --json --title "<título>" --thumb "<texto da thumbnail>"`.
+6. Escreva 10 títulos diferentes, cada um com o seu texto de thumbnail, e pontue os 10 pares numa única chamada com
+   `python3 metodo/pontuar.py titulos "<título 1>" "<thumb 1>" "<título 2>" "<thumb 2>" …`.
    Fique com o par de maior `score`.
 7. O texto da thumbnail tem no máximo 3 palavras, todas diferentes das palavras do título.
 8. Nunca invente números, datas, nomes ou resultados que não estejam no roteiro.

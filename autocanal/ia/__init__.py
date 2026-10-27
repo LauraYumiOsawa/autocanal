@@ -34,8 +34,8 @@ METODOS: dict[str, tuple[str, ...]] = {
 }
 # únicos comandos que a IA da etapa pode rodar (relativos à pasta)
 SCRIPTS: dict[str, tuple[str, ...]] = {
-    "roteiro": ("metodo/yt-script/hookscore.py",),
-    "metadados": ("metodo/yt-package/title.py",),
+    "roteiro": ("metodo/pontuar.py",),
+    "metadados": ("metodo/pontuar.py",),
 }
 
 

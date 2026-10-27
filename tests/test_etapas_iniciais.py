@@ -140,10 +140,10 @@ def test_roteiro_grava_json_e_valida_palavras(ctx, cfg, claude_falso):
     assert ler_json(ctx, "roteiro.json") == _roteiro(100)
     argv = claude_falso.chamadas()[-1]
     assert argv[argv.index("--allowedTools") + 1:] == [
-        "Read", "WebSearch", "WebFetch", "Bash(python3 metodo/yt-script/hookscore.py:*)"
+        "Read", "WebSearch", "WebFetch", "Bash(python3 metodo/pontuar.py:*)"
     ]
     assert (ctx.pasta / "metodo" / "yt-script" / "SKILL.md").exists()
-    assert "python3 metodo/yt-script/hookscore.py --json" in argv[2]
+    assert "python3 metodo/pontuar.py ganchos" in argv[2]
     assert f"Read(/{cfg.raiz.resolve()}/dados/tokens/**)" in argv
     assert argv[argv.index("--max-turns") + 1] == "30"
     assert "--model" not in argv
@@ -160,7 +160,7 @@ def test_roteiro_inclui_problemas_anteriores(ctx, cfg, claude_falso):
     roteiro.executar(ctx)
     primeiro = claude_falso.chamadas()[0][2]
     assert "por que o mar é salgado" in primeiro
-    assert "python3 metodo/yt-script/hookscore.py --json" in primeiro
+    assert "python3 metodo/pontuar.py ganchos" in primeiro
     assert "entre 75 e 150" in primeiro
     assert "muito longo" not in primeiro
 
