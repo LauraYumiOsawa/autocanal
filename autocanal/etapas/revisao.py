@@ -236,6 +236,17 @@ def _dados_do_video(ctx: Contexto) -> dict[str, str]:
     }
 
 
+def _sobre_branco(im: Image.Image) -> Image.Image:
+    """RGB da imagem; a transparência vira branco (`convert("RGB")` a deixaria preta)."""
+    if im.mode == "P" and "transparency" in im.info:
+        im = im.convert("RGBA")
+    if im.mode in ("RGBA", "LA"):
+        fundo = Image.new("RGB", im.size, "white")
+        fundo.paste(im, mask=im.getchannel("A"))
+        return fundo
+    return im.convert("RGB")
+
+
 def _visuais_por_segmento(ctx: Contexto) -> list[tuple[int, Path | None]]:
     """`(nº do segmento, JPEG reduzido)` na ordem do roteiro (`revisao/visuais/seg_NN.jpg`).
 
@@ -253,12 +264,14 @@ def _visuais_por_segmento(ctx: Contexto) -> list[tuple[int, Path | None]]:
         saida = destino / f"seg_{i:02d}.jpg"
         if m["tipo"] == "video":
             tmp = ctx.pasta / "revisao" / f"quadro_seg_{i:02d}"
-            [quadro] = ctx.midia.extrair_frames(arquivo, 1, tmp, lado_max=LADO_QUADRO)
-            shutil.move(str(quadro), saida)
-            shutil.rmtree(tmp, ignore_errors=True)
+            try:
+                [quadro] = ctx.midia.extrair_frames(arquivo, 1, tmp, lado_max=LADO_QUADRO)
+                shutil.move(str(quadro), saida)
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
         else:
             with Image.open(arquivo) as im:
-                im = im.convert("RGB")
+                im = _sobre_branco(im)
                 im.thumbnail((LADO_QUADRO, LADO_QUADRO))
                 im.save(saida, "JPEG")
         saidas.append((i, saida))

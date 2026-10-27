@@ -613,3 +613,29 @@ def test_revisor_recebe_visuais_depois_dos_quadros(ctx, cfg, con, claude_falso):
         *(f"revisao/quadros/quadro_{i:02d}.jpg" for i in range(1, 7)),
         "revisao/visuais/seg_01.jpg", "revisao/visuais/seg_03.jpg", "thumbnail.jpg",
     ]
+
+
+def test_visuais_transparente_vira_branco(ctx):
+    from PIL import Image
+
+    (ctx.pasta / "visuais").mkdir(exist_ok=True)
+    Image.new("RGBA", (100, 100), (0, 0, 0, 0)).save(ctx.pasta / "visuais" / "seg_01.png")
+    gravar_json(ctx, "fontes_midia.json", [{"caminho": "visuais/seg_01.png", "tipo": "imagem"}])
+    [(_, saida)] = revisao._visuais_por_segmento(ctx)
+    with Image.open(saida) as im:
+        assert min(im.getpixel((50, 50))) > 240  # branco, não preto
+
+
+def test_visuais_video_com_erro_nao_deixa_pasta_temporaria(ctx, monkeypatch):
+    (ctx.pasta / "visuais").mkdir(exist_ok=True)
+    (ctx.pasta / "visuais" / "seg_01.mp4").write_bytes(b"x")
+    gravar_json(ctx, "fontes_midia.json", [{"caminho": "visuais/seg_01.mp4", "tipo": "video"}])
+
+    def quebra(self, video, n, destino, lado_max=None):
+        destino.mkdir(parents=True)
+        raise RuntimeError("ffmpeg falhou")
+
+    monkeypatch.setattr(type(ctx.midia), "extrair_frames", quebra)
+    with pytest.raises(RuntimeError, match="ffmpeg falhou"):
+        revisao._visuais_por_segmento(ctx)
+    assert not (ctx.pasta / "revisao" / "quadro_seg_01").exists()
