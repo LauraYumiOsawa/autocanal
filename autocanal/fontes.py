@@ -6,6 +6,7 @@ abrir as fontes que não forem confirmadas, o que economiza turnos de leitura de
 """
 from __future__ import annotations
 
+import codecs
 import difflib
 import json
 import re
@@ -58,6 +59,17 @@ def normalizar(texto: str) -> str:
     return " ".join(re.findall(r"\w+", sem_acento))
 
 
+def _charset(tipo: str) -> str:
+    """Charset explícito do `Content-Type` se existir; senão UTF-8 (o `requests` assumiria Latin-1)."""
+    m = re.search(r"charset=[\"']?([\w.:-]+)", tipo, re.IGNORECASE)
+    if m:
+        try:
+            return codecs.lookup(m.group(1)).name
+        except LookupError:
+            pass
+    return "utf-8"
+
+
 def _baixar(url: str, obter) -> str:
     """Texto da página; `ValueError` com o motivo se não der para ler."""
     try:
@@ -75,8 +87,7 @@ def _baixar(url: str, obter) -> str:
             corpo.extend(pedaco)
             if len(corpo) >= MAX_BYTES:
                 break
-        return texto_da_pagina(bytes(corpo[:MAX_BYTES]).decode(r.encoding or "utf-8",
-                                                               errors="replace"))
+        return texto_da_pagina(bytes(corpo[:MAX_BYTES]).decode(_charset(tipo), errors="replace"))
     except requests.RequestException as e:
         raise ValueError(type(e).__name__) from None
     finally:
@@ -109,6 +120,8 @@ def conferir(fontes: list[dict], obter=None) -> list[dict]:
             status, detalhe = _procurar(trecho, _baixar(item["url"], obter))
         except ValueError as e:
             status, detalhe = "inacessivel", str(e)
+        except Exception as e:  # a conferência nunca derruba a etapa
+            status, detalhe = "inacessivel", f"{type(e).__name__}: {e}"
         resultado.append({**item, "status": status, "detalhe": detalhe})
     return resultado
 

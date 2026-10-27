@@ -122,3 +122,32 @@ def test_texto_da_pagina_sem_script_style():
     texto = fontes.texto_da_pagina(PAGINA)
     assert "doce" not in texto and "color" not in texto
     assert "O sal do mar vem das rochas" in " ".join(texto.split())
+
+
+def test_charset_desconhecido_no_cabecalho_nao_levanta():
+    resp = Resposta(PAGINA.encode(), tipo="text/html; charset=utf8mb4")
+    resp.encoding = "utf8mb4"  # o requests copia o charset do cabeçalho
+    [r] = fontes.conferir([_fonte("O sal do mar vem das rochas")], obter=_obter(resp))
+    assert r["status"] == "confirmada"
+
+
+def test_sem_charset_no_cabecalho_usa_utf8():
+    pagina = "<html><body><p>A água do mar é salgada por causa dos minerais.</p></body></html>"
+    resp = Resposta(pagina.encode("utf-8"), tipo="text/html")
+    resp.encoding = "ISO-8859-1"  # o que o requests assume sem charset
+    [r] = fontes.conferir([_fonte("água do mar é salgada")], obter=_obter(resp))
+    assert (r["status"], r["detalhe"]) == ("confirmada", "inteiro")
+
+
+def test_erro_inesperado_numa_fonte_vira_inacessivel_e_segue():
+    ok = Resposta(PAGINA.encode())
+
+    def obter(url, **kw):
+        if "ruim" in url:
+            raise RuntimeError("falha estranha")
+        return ok
+
+    ruim = {**_fonte("O sal do mar vem das rochas"), "url": "https://exemplo.org/ruim"}
+    r = fontes.conferir([ruim, _fonte("O sal do mar vem das rochas")], obter=obter)
+    assert r[0]["status"] == "inacessivel" and "falha estranha" in r[0]["detalhe"]
+    assert r[1]["status"] == "confirmada"
