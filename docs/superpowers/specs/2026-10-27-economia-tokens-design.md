@@ -141,7 +141,9 @@ tirou.
     ele corresponde às mesmas fontes (URL + trecho); senão confere e grava.
 - O roteiro confere logo depois de validar a resposta. A revisão usa `conferidas()` e põe o resultado no
   prompt (`{fontes_conferidas}`): as confirmadas são julgadas pelo trecho, sem abrir a página; só as
-  outras são abertas com a ferramenta de leitura de páginas.
+  outras são abertas com a ferramenta de leitura de páginas. A confirmada só em parte aparece como
+  `confirmada, parcial NN%`: o revisor abre a página se a parte não encontrada do trecho traz o dado da
+  afirmação (número, data, nome).
 - Página que bloqueia robôs ou depende de JavaScript cai em `inacessivel`; o revisor abre essa.
 
 ## 8. Refazer mais barato

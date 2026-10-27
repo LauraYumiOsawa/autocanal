@@ -21,7 +21,7 @@ class Pedido:
     web: bool = False                 # pesquisa na web e leitura de páginas
     imagens: tuple[Path, ...] = ()    # o adaptador decide como entregar
     metodos: tuple[str, ...] = ()     # skills do plugin copiadas para <pasta>/metodo/
-    scripts: tuple[str, ...] = ()     # relativos à pasta, ex.: "metodo/yt-script/hookscore.py"
+    scripts: tuple[str, ...] = ()     # relativos à pasta, ex.: "metodo/pontuar.py"
     timeout_s: int = 900
 
 

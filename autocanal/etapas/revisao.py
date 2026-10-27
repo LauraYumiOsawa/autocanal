@@ -203,6 +203,13 @@ def checagens(ctx: Contexto) -> list[tuple[str, str]]:
 CAMPOS_METADADOS = ("titulo", "texto_thumb", "cena_thumb", "descricao_final", "tags", "capitulos")
 
 
+def _rotulo_status(c: dict) -> str:
+    """`confirmada, parcial NN%` quando só parte do trecho foi achada; senão o status puro."""
+    if c["status"] == "confirmada" and c.get("detalhe", "").startswith("parcial"):
+        return f'confirmada, {c["detalhe"]}'
+    return c["status"]
+
+
 def _dados_do_video(ctx: Contexto) -> dict[str, str]:
     """Roteiro, transcrição, metadados e mídias compactos para o prompt (sem turnos de leitura)."""
     roteiro = ler_json(ctx, "roteiro.json")
@@ -218,7 +225,7 @@ def _dados_do_video(ctx: Contexto) -> dict[str, str]:
             ler_json_opcional(ctx, "transcricao.json", {}).get("texto", "")),
         "metadados": json_compacto({k: meta.get(k) for k in CAMPOS_METADADOS}),
         "fontes_conferidas": lista_md([
-            f'[{c["status"]}] {c["afirmacao"]} — {c["url"]} — "{c["trecho"]}"'
+            f'[{_rotulo_status(c)}] {c["afirmacao"]} — {c["url"]} — "{c["trecho"]}"'
             for c in fontes.conferidas(ctx.pasta, roteiro.get("fontes", []))
         ], "(nenhuma fonte)"),
         "midias": json_compacto([

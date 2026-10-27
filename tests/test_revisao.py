@@ -498,6 +498,35 @@ def test_revisor_recebe_conferencia(ctx, cfg, con, claude_falso, monkeypatch):
     assert '- [confirmada] 35 g de sal por litro — https://exemplo.org/mar — "35 g de sal por litro"' in prompt
 
 
+def test_revisor_ve_fonte_confirmada_so_em_parte(ctx, cfg, con, claude_falso, monkeypatch):
+    from autocanal import fontes
+
+    class Pagina:
+        status_code, headers, encoding = 200, {"Content-Type": "text/html"}, "utf-8"
+
+        def iter_content(self, chunk_size=65536):
+            yield "<p>O mar tem sal por litro de água, segundo os cientistas.</p>".encode()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(fontes.requests, "get", lambda url, **kw: Pagina())
+    rot = ler_json(ctx, "roteiro.json")
+    rot["fontes"] = [
+        {"afirmacao": "A", "url": "https://exemplo.org/a",
+         "trecho": "o mar tem sal por litro de água, segundo os cientistas"},
+        {"afirmacao": "B", "url": "https://exemplo.org/b",
+         "trecho": "o mar tem sal por litro de água, segundo os cientistas, 35 g"},
+    ]
+    gravar_json(ctx, "roteiro.json", rot)
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    claude_falso.responder(_parecer(True))
+    revisao.executar(ctx)
+    prompt = claude_falso.chamadas()[0][2]
+    assert "- [confirmada] A — " in prompt
+    assert "- [confirmada, parcial 85%] B — " in prompt
+
+
 def _png(caminho: Path, tamanho):
     from PIL import Image
 
