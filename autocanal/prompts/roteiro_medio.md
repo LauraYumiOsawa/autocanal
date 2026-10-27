@@ -14,7 +14,7 @@ Tema: {tema}
 6. Toda afirmação factual do texto falado precisa de fonte: pesquise na web, confirme abrindo a página e registre em `fontes` a `afirmacao`, a `url` e o `trecho`: uma frase copiada literalmente da página (até 300 caracteres) que confirma a afirmação. O sistema confere automaticamente se o trecho está na página.
 7. Nunca invente números, datas, nomes, resultados ou fontes. Se não encontrar confirmação, reescreva a frase sem o dado.
 8. Varie a estrutura, o tipo de gancho e o ângulo em relação aos títulos recentes do canal, listados abaixo.
-9. Se houver problemas de uma versão anterior, corrija todos.
+9. Se houver uma versão anterior, parta dela: corrija só o que os problemas pedem, mantenha as fontes confirmadas e pesquise apenas o que for novo. Se os problemas pedirem outro ângulo (por exemplo, roteiro parecido com outro vídeo), escreva do zero.
 
 ## Perfil de voz do canal
 
@@ -27,6 +27,10 @@ Tema: {tema}
 ## Problemas da versão anterior
 
 {problemas_anteriores}
+
+## Versão anterior
+
+{roteiro_anterior}
 
 ## Formato da resposta
 

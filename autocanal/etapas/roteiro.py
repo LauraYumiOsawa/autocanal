@@ -7,6 +7,9 @@ from autocanal.etapas.base import (
     ErroEtapa,
     carregar_prompt,
     gravar_json,
+    json_compacto,
+    ler_json,
+    ler_json_opcional,
     lista_md,
     perfil_voz,
     problemas_revisao,
@@ -95,6 +98,28 @@ def achatar(dados: dict) -> dict:
     }
 
 
+PRIMEIRA_VERSAO = "(nenhuma: esta é a primeira versão)"
+
+
+def roteiro_anterior(ctx: Contexto) -> str:
+    """Versão reprovada (segmentos e fontes com o status da conferência) para corrigir, sem
+    refazer a pesquisa toda; só existe quando a revisão devolveu problemas."""
+    if not problemas_revisao(ctx) or not (ctx.pasta / "roteiro.json").exists():
+        return PRIMEIRA_VERSAO
+    r = ler_json(ctx, "roteiro.json")
+    conferidas = ler_json_opcional(ctx, fontes.ARQUIVO, {}).get("resultado", [])
+    status = {(c["url"], c["trecho"]): c["status"] for c in conferidas}
+    return json_compacto({
+        "segmentos": [
+            {"texto": s["texto"], "visual": s.get("visual", ""), "cena": s.get("cena", "")}
+            for s in r["segmentos"]
+        ],
+        "fontes": [{**f, "status": status.get(
+                        (f.get("url", ""), str(f.get("trecho") or "").strip()), "?")}
+                   for f in r.get("fontes", [])],
+    })
+
+
 def executar(ctx: Contexto) -> None:
     fmt = ctx.formato
     schema = SCHEMAS.get(fmt.nome)
@@ -108,6 +133,7 @@ def executar(ctx: Contexto) -> None:
         palavras_min=fmt.palavras_min,
         palavras_max=fmt.palavras_max,
         problemas_anteriores=lista_md(problemas_revisao(ctx), "Nenhum: esta é a primeira versão."),
+        roteiro_anterior=roteiro_anterior(ctx),
     )
     r = ia.chamar(ctx.cfg, ctx.con, ctx.job.id, "roteiro",
                   ia.Pedido(prompt=prompt, schema=schema, pasta=ctx.pasta, web=True,

@@ -126,7 +126,7 @@ def test_titulos_recentes_e_perfil_voz(ctx, cfg, con):
 def test_template_tem_todos_os_campos():
     t = TEMPLATE.read_text(encoding="utf-8")
     for campo in ("tema", "perfil_voz", "titulos_recentes", "palavras_min",
-                  "palavras_max", "problemas_anteriores"):
+                  "palavras_max", "problemas_anteriores", "roteiro_anterior"):
         assert "{" + campo + "}" in t
 
 
@@ -672,3 +672,22 @@ def test_roteiro_grava_fontes_conferidas(ctx, cfg, claude_falso):
     conf = ler_json(ctx, "fontes_conferidas.json")
     assert [r["status"] for r in conf["resultado"]] == ["inacessivel"]  # rede bloqueada
     assert conf["fontes"] == [{"url": "https://exemplo.org/mar", "trecho": "a água do mar é salgada"}]
+
+
+def test_roteiro_primeira_versao_sem_anterior(ctx, cfg, claude_falso):
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    claude_falso.responder(_ok(_roteiro(100)))
+    roteiro.executar(ctx)
+    assert "(nenhuma: esta é a primeira versão)" in claude_falso.chamadas()[0][2]
+
+
+def test_roteiro_refeito_leva_versao_anterior(ctx, cfg, claude_falso):
+    cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
+    claude_falso.responder(_ok(_roteiro(100)), _ok(_roteiro(100)))
+    roteiro.executar(ctx)  # 1ª versão grava roteiro.json e a conferência (rede bloqueada)
+    gravar_json(ctx, "problemas_revisao.json", {"problemas": ["fonte 1 não confirma"]})
+    roteiro.executar(ctx)
+    prompt = claude_falso.chamadas()[1][2]
+    assert "palavra0x0" in prompt.split("## Versão anterior", 1)[1]
+    assert '"status":"inacessivel"' in prompt
+    assert "(nenhuma: esta é a primeira versão)" not in prompt
