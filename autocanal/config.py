@@ -79,6 +79,7 @@ def _etapas_conhecidas(chaves, onde: str) -> None:
 class ConfigProvedor(BaseModel):
     bin: str
     modelos: dict[str, str | None] = {}
+    esforco: dict[str, str | None] = {}  # nível de esforço/raciocínio por etapa
 
 
 class ConfigIA(BaseModel):
@@ -95,6 +96,7 @@ class ConfigIA(BaseModel):
         _etapas_conhecidas(self.max_turns, "ia.max_turns")
         for nome, prov in self.provedores.items():
             _etapas_conhecidas(prov.modelos, f"ia.provedores.{nome}.modelos")
+            _etapas_conhecidas(prov.esforco, f"ia.provedores.{nome}.esforco")
         for usado in {self.padrao, *self.etapas.values()}:
             if usado not in self.provedores:
                 raise ValueError(f"provedor {usado} sem entrada em ia.provedores")

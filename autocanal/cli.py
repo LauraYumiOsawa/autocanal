@@ -13,7 +13,9 @@ from zoneinfo import ZoneInfo
 
 import typer
 
-from autocanal import agendador, fila, grade, ia, planejador, produtor, publicador, relatorio
+from autocanal import (
+    agendador, bancada, fila, grade, ia, planejador, produtor, publicador, relatorio,
+)
 from autocanal.config import ETAPAS_IA, Config, carregar
 from autocanal.db import conectar
 from autocanal.fila import Estado
@@ -510,3 +512,34 @@ def instalar_timer(
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     subprocess.run(["systemctl", "--user", "enable", "--now", "autocanal.timer"], check=True)
     typer.echo("timer habilitado: autocanal.timer")
+
+
+bancada_app = typer.Typer(help="Mede o gasto de IA repetindo etapas em cópias de jobs prontos.")
+app.add_typer(bancada_app, name="bancada")
+
+
+@bancada_app.command("rodar")
+def bancada_rodar(
+    ctx: typer.Context,
+    job: str,
+    etapa: str,
+    rotulo: str = typer.Option(..., "--rotulo", help="Nome do lado medido (ex.: antes, depois)."),
+    modelo: str = typer.Option(None, "--modelo", help="Modelo só para esta etapa e execução."),
+    esforco: str = typer.Option(None, "--esforco", help="Esforço só para esta etapa e execução."),
+) -> None:
+    """Roda a etapa numa cópia isolada do job e mostra tokens, custo e métricas."""
+    cfg = carregar(ctx.obj)
+    con = conectar(cfg.dados / "autocanal.db")
+    try:
+        linha = bancada.rodar(cfg, con, job, etapa, rotulo, modelo=modelo, esforco=esforco)
+    except (ValueError, KeyError) as e:
+        typer.echo(f"erro: {e}")
+        raise typer.Exit(1)
+    typer.echo(json.dumps(linha, ensure_ascii=False, indent=2))
+
+
+@bancada_app.command("relatorio")
+def bancada_relatorio(ctx: typer.Context) -> None:
+    """Médias por etapa e rótulo das execuções da bancada."""
+    for linha in bancada.relatorio(carregar(ctx.obj)):
+        typer.echo(linha)
