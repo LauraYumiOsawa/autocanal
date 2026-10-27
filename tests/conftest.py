@@ -12,8 +12,10 @@ PLUGIN_DIR = Path(
 
 
 @pytest.fixture(autouse=True)
-def sem_rede_nas_fontes(monkeypatch):
-    """A conferência de fontes nunca baixa páginas de verdade nos testes."""
+def sem_rede_nas_fontes(monkeypatch, request):
+    """A conferência de fontes nunca baixa páginas de verdade nos testes (menos nos `real`)."""
+    if request.node.get_closest_marker("real"):
+        return
     import requests
 
     def bloqueado(url, **kw):
