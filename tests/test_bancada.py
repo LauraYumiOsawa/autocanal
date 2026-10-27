@@ -112,6 +112,7 @@ def test_relatorio_medias(cfg):
         "".join(json.dumps(x) + "\n" for x in linhas), encoding="utf-8")
     texto = "\n".join(bancada.relatorio(cfg))
     assert "metadados" in texto and "antes" in texto and "200" in texto and "nota_titulo=90" in texto
+    assert "chamadas=1" in texto
 
 
 def test_cli_bancada(raiz_teste, cfg, con, job, falso):

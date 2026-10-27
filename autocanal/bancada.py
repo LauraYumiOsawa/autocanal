@@ -186,6 +186,7 @@ def relatorio(cfg: Config) -> list[str]:
             f"saida={_fmt(_media([x['tokens_saida'] for x in ok]), 0)}",
             f"custo={_fmt(_media([x['custo_usd'] for x in ok]), 2)}",
             f"turnos={_fmt(_media([x['turnos'] for x in ok]), 1)}",
+            f"chamadas={_fmt(_media([x['chamadas'] for x in ok]), 1)}",
             *(f"{k}={m:g}" for k, vs in sorted(metricas.items())
               if (m := _media(vs)) is not None),
         ]
