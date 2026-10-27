@@ -87,7 +87,7 @@ Substitui `autocanal/claude.py`, que deixa de existir.
 | `ia/base.py` | `Pedido`, `Resultado`, `Capacidades`, erros e a expressão regular de limite de uso |
 | `ia/cofre.py` | lista única de caminhos proibidos |
 | `ia/metodo.py` | cópia das skills do plugin para a pasta do job |
-| `ia/schema.py` | `schema_estrito()` |
+| `ia/schema.py` | `schema_estrito()` e `remover_nulos_opcionais()` |
 | `ia/claude_cli.py` | adaptador do Claude Code |
 | `ia/codex_cli.py` | adaptador do Codex |
 
@@ -160,8 +160,8 @@ Cada adaptador declara as suas `Capacidades` (web, imagens, scripts). Claude e C
 - As funções `ferramentas()` de `roteiro.py` e `metadados.py` e as constantes `FERRAMENTAS` de
   `revisao.py` e `planejador.py` saem; cada etapa monta o seu `Pedido`.
 - A curadoria passa a registrar com a etapa `curadoria` (antes, `visuais`).
-- Campos opcionais lidos das respostas passam a aceitar `null` (ex.: `e.get("nova_cena") or ""`),
-  porque `schema_estrito()` os torna obrigatórios e anuláveis.
+- As etapas não precisam tratar `null`: o adaptador do Codex remove os nulos dos campos que eram
+  opcionais no schema original antes de validar (seção 8).
 
 ## 4. Config
 
@@ -253,8 +253,9 @@ codex exec --json --ephemeral --skip-git-repo-check
 
 (As chaves de `-c` são as confirmadas na sondagem.)
 
-- `schema.json` recebe `schema_estrito(pedido.schema)`; a resposta lida de `-o` é validada contra o
-  schema original.
+- `schema.json` recebe `schema_estrito(pedido.schema)`. Da resposta lida de `-o`, saem as chaves com
+  `null` que eram opcionais no schema original (`remover_nulos_opcionais()`); depois ela é validada
+  contra o schema original.
 - Tokens: do evento `turn.completed`. `custo_usd` e `turnos` ficam `None`.
 - Limite de uso: a expressão regular de `ia/base.py`, ampliada com as mensagens do Codex, aplicada aos
   eventos de erro e ao stderr.
