@@ -665,6 +665,32 @@ def test_visuais_refazem_so_os_trechos_apontados_pelo_revisor(ctx, monkeypatch):
         "flux:1", "flux:novo-seg_02", "flux:3"]
 
 
+def test_visuais_ignoram_revisao_velha_de_antes_da_quarentena(cfg, con, ctx, monkeypatch):
+    # prova real (bd01, 16/11): a quarentena zerou as rodadas, mas o revisao_2.json do ciclo
+    # anterior (checagens) ficou na pasta; na nova rodada 1 o revisor apontou 3 trechos, e os
+    # visuais leram o revisao_2 velho, mantiveram tudo e repetiram as mesmas imagens reprovadas
+    _segmentos(ctx, ["a b", "c d", "e f"])
+    fontes = []
+    for i in (1, 2, 3):
+        arq = ctx.pasta / "visuais" / f"seg_{i:02d}.png"
+        arq.parent.mkdir(parents=True, exist_ok=True)
+        arq.write_bytes(b"bom")
+        fontes.append({"caminho": str(arq), "tipo": "imagem", "origem": "flux",
+                       "url": f"flux:{i}", "licenca": "x", "autor": "y"})
+    gravar_json(ctx, "fontes_midia.json", fontes)
+    gravar_json(ctx, "revisao_2.json", {"origem": "checagens", "aprovado": False,
+                                        "problemas": ["trecho 2 com fundo procedural"]})
+    gravar_json(ctx, "revisao_1.json", {"origem": "revisor", "aprovado": False,
+                                        "problemas": ["seg 2 com quatro mãos"],
+                                        "trechos_visuais": [2]})
+    fila.atualizar(con, ctx.job.id, tentativas_revisao=1)
+    ctx = contexto_para(cfg, con, fila.obter(con, ctx.job.id))
+    banco = _BancoNovo()
+    monkeypatch.setattr(visuais, "criar_cadeia", lambda *a, **k: [banco])
+    visuais.executar(ctx)
+    assert banco.pedidos == [["seg_02"]]
+
+
 def test_roteiro_grava_fontes_conferidas(ctx, cfg, claude_falso):
     cfg.ia.provedores["claude"].bin = claude_falso.claude_bin
     claude_falso.responder(_ok(_roteiro(100)))

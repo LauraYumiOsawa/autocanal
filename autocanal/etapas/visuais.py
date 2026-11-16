@@ -125,9 +125,17 @@ def _a_manter(ctx: Contexto, anteriores: list[dict], n_segmentos: int) -> dict[i
     Reprovação das checagens automáticas (fundo procedural): ficam todos os não procedurais.
     Reprovação do revisor: ficam os que ele não apontou em `trechos_visuais` (sem a lista, tudo é
     refeito). Roteiro reescrito depois dos visuais: tudo é refeito.
+
+    A última revisão é a da rodada atual do job: a quarentena zera as rodadas, mas deixa os
+    `revisao_N.json` do ciclo anterior na pasta. Com as rodadas zeradas (logo após a
+    quarentena), vale a de número mais alto, que foi a que mandou o job para a quarentena.
     """
-    rodadas = sorted(ctx.pasta.glob("revisao_*.json"),
-                     key=lambda a: int(a.stem.split("_")[1]) if a.stem.split("_")[1].isdigit() else 0)
+    if ctx.job.tentativas_revisao:
+        rodadas = [ctx.pasta / f"revisao_{ctx.job.tentativas_revisao}.json"]
+    else:
+        rodadas = sorted(
+            ctx.pasta.glob("revisao_*.json"),
+            key=lambda a: int(a.stem.split("_")[1]) if a.stem.split("_")[1].isdigit() else 0)
     if not rodadas or len(anteriores) != n_segmentos:
         return {}
     try:
